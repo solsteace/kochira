@@ -3,3 +3,5 @@ root = "."
 [build]
     cmd = "go build -o ./tmp/out ./cmd"
     bin = "./tmp/out"
+[log]
+    time = true

@@ -6,3 +6,17 @@ services:
       - ./:/app
     ports:
       - 10000:${PORT:-10000}
+    environment:
+      DB_URL: ${DB_URL:-postgresql://postgres:dont_you_have_something_better_to_do@account-db:5432/postgres}
+
+  account-db:
+    image: postgres:17-alpine
+    volumes:
+      - kochira-account-db-vol:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASS:-dont_you_have_something_better_to_do}
+
+volumes:
+  kochira-account-db-vol:
+
+
