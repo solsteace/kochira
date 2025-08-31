@@ -1,0 +1,7 @@
+root = "./app"
+
+[build]
+    cmd = "go build -o ./app/tmp/out ./app/cmd"
+    bin = "./app/tmp/out"
+[log]
+    time = true

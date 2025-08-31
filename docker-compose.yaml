@@ -1,0 +1,36 @@
+services:
+  # gateway:
+  #   image: caddy:2.10-alpine
+  #   ports:
+  #     - 8888:80
+  #   volumes:
+  #     - ./etc/caddy:/etc/caddy
+  #     - caddy-vol:/data
+
+  server:
+    ports:
+      - 8888:8888
+    build:
+      dockerfile: ./app/Dockerfile
+      target: devel
+    volumes:
+      - ./app:/kochira/app
+      - ./lib:/kochira/lib
+    env_file: 
+      - path: "./app/.env"
+        required: true
+  db:
+    image: postgres:alpine
+    volumes:
+      - db-vol:/var/lib/postgresql
+    environment:
+      POSTGRES_USER: kochira
+      POSTGRES_DB: kochira
+      POSTGRES_PASSWORD: beats_me
+  cache:
+      image: valkey/valkey:alpine
+
+
+volumes:
+  db-vol:
+  # caddy-vol:
