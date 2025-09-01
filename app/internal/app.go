@@ -1,0 +1,108 @@
+package internal
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	_ "github.com/jackc/pgx/stdlib"
+	"github.com/jmoiron/sqlx"
+	"github.com/solsteace/go-lib/reqres"
+	"github.com/solsteace/go-lib/token"
+	"github.com/solsteace/kochira/internal/account"
+	"github.com/solsteace/kochira/internal/account/cache"
+	domainService "github.com/solsteace/kochira/internal/account/domain/service"
+	"github.com/solsteace/kochira/internal/account/repository"
+	"github.com/solsteace/kochira/internal/account/utility"
+	"github.com/valkey-io/valkey-go"
+)
+
+func RunApp() {
+	loadEnv()
+
+	// ========================================
+	// Utils
+	// ========================================
+	dbClient, err := sqlx.Connect("pgx", EnvDbUrl)
+	if err != nil {
+		log.Fatalf("Error during connecting to DB: %v", err)
+	}
+	defer dbClient.Close()
+
+	cacheClient, err := valkey.NewClient(
+		valkey.MustParseURL(EnvCacheUrl))
+	if err != nil {
+		log.Fatalf("Error during connecting to cache: %v", err)
+	}
+	defer cacheClient.Close()
+
+	upSince := time.Now().Unix()
+	secretHandler := utility.NewBcrypt(10)
+	tokenHandler := utility.NewJwt[token.Auth](
+		EnvTokenIssuer,
+		EnvTokenSecret,
+		time.Duration(EnvTokenLifetime))
+
+	// ========================================
+	// Layers
+	// ========================================
+	authAttemptDomainService := domainService.NewAuthAttempt(
+		3,
+		3,
+		120*time.Second,
+		10*time.Second)
+
+	accountRepo := repository.NewPgAccount(dbClient)
+	authAttemptCache := cache.NewValkeyAuthAttempt(
+		cacheClient,
+		authAttemptDomainService.RetentionTime(15*time.Second))
+
+	authService := account.NewAuthService(
+		accountRepo,
+		authAttemptCache,
+		secretHandler,
+		tokenHandler,
+		tokenHandler,
+		authAttemptDomainService)
+	authController := account.NewAuthController(authService)
+
+	// ========================================
+	// Routings
+	// ========================================
+	app := chi.NewRouter()
+	app.Use(middleware.Logger)
+	app.Use(middleware.Recoverer)
+
+	v1 := chi.NewRouter()
+	account.UseAuth(v1, authController)
+
+	app.Mount("/api/v1", v1)
+	app.Get("/health", reqres.HttpHandlerWithError(
+		func(w http.ResponseWriter, r *http.Request) error {
+			return reqres.HttpOk(
+				w,
+				http.StatusOK,
+				map[string]any{
+					"msg": "Server is healthy",
+					"data": map[string]any{
+						"uptime": time.Now().Unix() - upSince,
+					}})
+		}))
+	app.NotFound(reqres.HttpHandlerWithError(
+		func(w http.ResponseWriter, r *http.Request) error {
+			return reqres.HttpOk(
+				w,
+				http.StatusNotFound,
+				map[string]any{
+					"msg": "The endpoint you're reaching wasn't found"})
+		}))
+
+	// ========================================
+	// Init
+	// ========================================
+	fmt.Printf("Server's running at :%d\n", EnvPort)
+	http.ListenAndServe(fmt.Sprintf(":%d", EnvPort), app)
+}

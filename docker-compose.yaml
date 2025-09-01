@@ -28,9 +28,13 @@ services:
       POSTGRES_DB: kochira
       POSTGRES_PASSWORD: beats_me
   cache:
-      image: valkey/valkey:alpine
+    image: valkey/valkey:alpine
+    volumes:
+      - cache-vol:/data
+
 
 
 volumes:
   db-vol:
+  cache-vol:
   # caddy-vol:
