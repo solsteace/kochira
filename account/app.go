@@ -1,4 +1,4 @@
-package internal
+package account
 
 import (
 	"fmt"
@@ -13,28 +13,27 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/solsteace/go-lib/reqres"
 	"github.com/solsteace/go-lib/token"
-	"github.com/solsteace/kochira/internal/account"
-	"github.com/solsteace/kochira/internal/account/cache"
-	domainService "github.com/solsteace/kochira/internal/account/domain/service"
-	"github.com/solsteace/kochira/internal/account/repository"
-	"github.com/solsteace/kochira/internal/account/utility"
+	account "github.com/solsteace/kochira/account/internal"
+	"github.com/solsteace/kochira/account/internal/cache"
+	domainService "github.com/solsteace/kochira/account/internal/domain/service"
+	"github.com/solsteace/kochira/account/internal/repository"
+	"github.com/solsteace/kochira/account/internal/utility"
 	"github.com/valkey-io/valkey-go"
 )
 
 func RunApp() {
-	loadEnv()
 
 	// ========================================
 	// Utils
 	// ========================================
-	dbClient, err := sqlx.Connect("pgx", EnvDbUrl)
+	dbClient, err := sqlx.Connect("pgx", envDbUrl)
 	if err != nil {
 		log.Fatalf("Error during connecting to DB: %v", err)
 	}
 	defer dbClient.Close()
 
 	cacheClient, err := valkey.NewClient(
-		valkey.MustParseURL(EnvCacheUrl))
+		valkey.MustParseURL(envCacheUrl))
 	if err != nil {
 		log.Fatalf("Error during connecting to cache: %v", err)
 	}
@@ -43,13 +42,13 @@ func RunApp() {
 	upSince := time.Now().Unix()
 	secretHandler := utility.NewBcrypt(10)
 	accessTokenHandler := utility.NewJwt[token.Auth](
-		EnvTokenIssuer,
-		EnvTokenSecret,
-		time.Duration(EnvAccessTokenLifetime))
+		envTokenIssuer,
+		envTokenSecret,
+		time.Duration(envAccessTokenLifetime))
 	refreshTokenHandler := utility.NewJwt[token.Auth](
-		EnvTokenIssuer,
-		strings.Repeat(EnvTokenSecret, 2),
-		time.Duration(EnvRefreshTokenLifetime))
+		envTokenIssuer,
+		strings.Repeat(envTokenSecret, 2),
+		time.Duration(envRefreshTokenLifetime))
 
 	// ========================================
 	// Layers
@@ -66,7 +65,7 @@ func RunApp() {
 		authAttemptDomainService.RetentionTime(15*time.Second))
 	tokenCache := cache.NewValkeyToken(
 		cacheClient,
-		time.Duration(EnvRefreshTokenLifetime)*time.Second)
+		time.Duration(envRefreshTokenLifetime)*time.Second)
 
 	authService := account.NewAuthService(
 		accountRepo,
@@ -112,6 +111,6 @@ func RunApp() {
 	// ========================================
 	// Init
 	// ========================================
-	fmt.Printf("Server's running at :%d\n", EnvPort)
-	http.ListenAndServe(fmt.Sprintf(":%d", EnvPort), app)
+	fmt.Printf("Server's running at :%d\n", envPort)
+	http.ListenAndServe(fmt.Sprintf(":%d", envPort), app)
 }

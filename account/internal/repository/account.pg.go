@@ -6,17 +6,17 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/solsteace/go-lib/oops"
-	"github.com/solsteace/kochira/internal/account/domain"
+	"github.com/solsteace/kochira/account/internal/domain"
 )
 
-type pgAccountRow struct {
+type pgUserRow struct {
 	Id       uint   `db:"id"`
 	Username string `db:"username"`
 	Password string `db:"password"`
 	Email    string `db:"email"`
 }
 
-func (row pgAccountRow) ToModel() domain.User {
+func (row pgUserRow) ToModel() domain.User {
 	return domain.User{
 		Id:       row.Id,
 		Username: row.Username,
@@ -24,24 +24,24 @@ func (row pgAccountRow) ToModel() domain.User {
 		Email:    row.Email}
 }
 
-func newPgAccountRow(a domain.User) pgAccountRow {
-	return pgAccountRow{
+func newPgAccountRow(a domain.User) pgUserRow {
+	return pgUserRow{
 		a.Id,
 		a.Username,
 		a.Password,
 		a.Email}
 }
 
-type pgAccount struct {
+type pgUser struct {
 	db *sqlx.DB
 }
 
-func NewPgAccount(db *sqlx.DB) pgAccount {
-	return pgAccount{db}
+func NewPgAccount(db *sqlx.DB) pgUser {
+	return pgUser{db}
 }
 
-func (repo pgAccount) GetById(id uint) (domain.User, error) {
-	row := new(pgAccountRow)
+func (repo pgUser) GetById(id uint) (domain.User, error) {
+	row := new(pgUserRow)
 
 	query := "SELECT * FROM users WHERE id = $1"
 	args := []any{id}
@@ -52,8 +52,8 @@ func (repo pgAccount) GetById(id uint) (domain.User, error) {
 	return domain.User{}, nil
 }
 
-func (repo pgAccount) GetByUsername(username string) (domain.User, error) {
-	rows := new([]pgAccountRow)
+func (repo pgUser) GetByUsername(username string) (domain.User, error) {
+	rows := new([]pgUserRow)
 
 	query := "SELECT * FROM users WHERE username = $1 LIMIT 1"
 	if err := repo.db.Select(rows, query, username); err != nil {
@@ -68,7 +68,7 @@ func (repo pgAccount) GetByUsername(username string) (domain.User, error) {
 	return (*rows)[0].ToModel(), nil
 }
 
-func (repo pgAccount) Create(a domain.User) error {
+func (repo pgUser) Create(a domain.User) error {
 	row := newPgAccountRow(a)
 
 	query := `
@@ -87,7 +87,7 @@ func (repo pgAccount) Create(a domain.User) error {
 	return nil
 }
 
-func (repo pgAccount) Update(a domain.User) error {
+func (repo pgUser) Update(a domain.User) error {
 	row := newPgAccountRow(a)
 
 	query := `
@@ -105,6 +105,6 @@ func (repo pgAccount) Update(a domain.User) error {
 	return nil
 }
 
-func (repo pgAccount) DeleteById(id uint) error {
+func (repo pgUser) DeleteById(id uint) error {
 	return nil
 }

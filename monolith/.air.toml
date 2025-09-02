@@ -1,0 +1,7 @@
+root = "."
+
+[build]
+    cmd = "go build -o ./monolith/tmp/out ./monolith/cmd"
+    bin = "./monolith/tmp/out"
+[log]
+    time = true

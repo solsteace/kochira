@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/solsteace/kochira/internal/account/domain"
+	"github.com/solsteace/kochira/account/internal/domain"
 	"github.com/valkey-io/valkey-go"
 	"github.com/valkey-io/valkey-go/valkeycompat"
 )

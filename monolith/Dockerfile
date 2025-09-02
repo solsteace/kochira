@@ -1,9 +1,10 @@
 FROM golang:1.24.6-alpine AS base
 WORKDIR /kochira
-RUN mkdir ./app ./lib
-COPY ./app/go.* ./app
+RUN mkdir ./monolith/ ./lib ./account
+COPY ./monolith/go.* ./monolith/
+COPY ./account/go.* ./account/
 COPY ./lib/go.*  ./lib
-RUN go work init && go work use ./app ./lib
+RUN go work init && go work use ./monolith ./lib ./account
 
 
 FROM alpine/curl:latest AS devtools
@@ -17,4 +18,4 @@ RUN curl -fsSL https://raw.githubusercontent.com/pressly/goose/master/install.sh
 FROM base AS devel
 COPY --from=devtools /usr/local/bin /
 RUN go install github.com/air-verse/air@latest
-CMD ["air", "-c", "./app/.air.toml"]
+CMD ["air", "-c", "./monolith/.air.toml"]

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/solsteace/kochira/internal/account/domain"
+	"github.com/solsteace/kochira/account/internal/domain"
 )
 
 type AuthAttempt interface {

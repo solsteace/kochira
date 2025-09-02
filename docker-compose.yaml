@@ -11,13 +11,14 @@ services:
     ports:
       - 8888:8888
     build:
-      dockerfile: ./app/Dockerfile
+      dockerfile: ./monolith/Dockerfile
       target: devel
     volumes:
-      - ./app:/kochira/app
+      - ./account:/kochira/account
+      - ./monolith:/kochira/monolith
       - ./lib:/kochira/lib
     env_file: 
-      - path: "./app/.env"
+      - path: "./account/.env"
         required: true
   db:
     image: postgres:alpine

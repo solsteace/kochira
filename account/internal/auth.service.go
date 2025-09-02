@@ -1,4 +1,4 @@
-package account
+package internal
 
 import (
 	"errors"
@@ -8,14 +8,14 @@ import (
 	"github.com/solsteace/go-lib/oops"
 	"github.com/solsteace/go-lib/secret"
 	"github.com/solsteace/go-lib/token"
-	"github.com/solsteace/kochira/internal/account/cache"
-	"github.com/solsteace/kochira/internal/account/domain"
-	domainService "github.com/solsteace/kochira/internal/account/domain/service"
-	"github.com/solsteace/kochira/internal/account/repository"
+	"github.com/solsteace/kochira/account/internal/cache"
+	"github.com/solsteace/kochira/account/internal/domain"
+	domainService "github.com/solsteace/kochira/account/internal/domain/service"
+	"github.com/solsteace/kochira/account/internal/repository"
 )
 
 type authService struct {
-	userRepo           repository.Account
+	userRepo           repository.User
 	authAttemptCache   cache.AuthAttempt
 	tokenCache         cache.Token
 	secret             secret.Handler
@@ -25,7 +25,7 @@ type authService struct {
 }
 
 func NewAuthService(
-	userRepo repository.Account,
+	userRepo repository.User,
 	authAttemptCache cache.AuthAttempt,
 	tokenCache cache.Token,
 	secret secret.Handler,

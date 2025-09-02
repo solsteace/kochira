@@ -1,4 +1,4 @@
-module github.com/solsteace/kochira
+module github.com/solsteace/kochira/account
 
 go 1.24.6
 

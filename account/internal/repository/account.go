@@ -1,8 +1,8 @@
 package repository
 
-import "github.com/solsteace/kochira/internal/account/domain"
+import "github.com/solsteace/kochira/account/internal/domain"
 
-type Account interface {
+type User interface {
 	GetById(id uint) (domain.User, error)
 	GetByUsername(username string) (domain.User, error)
 
