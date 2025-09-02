@@ -12,9 +12,10 @@ var (
 	EnvCacheUrl string
 	EnvDbUrl    string
 
-	EnvTokenIssuer   string
-	EnvTokenSecret   string
-	EnvTokenLifetime int
+	EnvTokenIssuer          string
+	EnvTokenSecret          string
+	EnvAccessTokenLifetime  int
+	EnvRefreshTokenLifetime int
 )
 
 func loadEnv() {
@@ -38,6 +39,7 @@ func loadEnv() {
 	case int(tokenLifetime) < 0:
 		log.Fatal("`TOKEN_LIFETIME: converted value cannot be negative (get: %d)`", tokenLifetime)
 	default:
-		EnvTokenLifetime = int(tokenLifetime)
+		EnvAccessTokenLifetime = int(tokenLifetime)
+		EnvRefreshTokenLifetime = EnvAccessTokenLifetime * 3
 	}
 }

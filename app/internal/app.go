@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -41,10 +42,14 @@ func RunApp() {
 
 	upSince := time.Now().Unix()
 	secretHandler := utility.NewBcrypt(10)
-	tokenHandler := utility.NewJwt[token.Auth](
+	accessTokenHandler := utility.NewJwt[token.Auth](
 		EnvTokenIssuer,
 		EnvTokenSecret,
-		time.Duration(EnvTokenLifetime))
+		time.Duration(EnvAccessTokenLifetime))
+	refreshTokenHandler := utility.NewJwt[token.Auth](
+		EnvTokenIssuer,
+		strings.Repeat(EnvTokenSecret, 2),
+		time.Duration(EnvRefreshTokenLifetime))
 
 	// ========================================
 	// Layers
@@ -59,13 +64,17 @@ func RunApp() {
 	authAttemptCache := cache.NewValkeyAuthAttempt(
 		cacheClient,
 		authAttemptDomainService.RetentionTime(15*time.Second))
+	tokenCache := cache.NewValkeyToken(
+		cacheClient,
+		time.Duration(EnvRefreshTokenLifetime)*time.Second)
 
 	authService := account.NewAuthService(
 		accountRepo,
 		authAttemptCache,
+		tokenCache,
 		secretHandler,
-		tokenHandler,
-		tokenHandler,
+		accessTokenHandler,
+		refreshTokenHandler,
 		authAttemptDomainService)
 	authController := account.NewAuthController(authService)
 

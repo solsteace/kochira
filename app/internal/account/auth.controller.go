@@ -2,8 +2,10 @@ package account
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
+	"github.com/solsteace/go-lib/oops"
 	"github.com/solsteace/go-lib/reqres"
 )
 
@@ -85,4 +87,18 @@ func (ac authController) Refresh(w http.ResponseWriter, r *http.Request) error {
 			"access":  result.AccessToken,
 			"refresh": result.RefreshToken}}
 	return reqres.HttpOk(w, http.StatusOK, resPayload)
+}
+
+func (ac authController) Logout(w http.ResponseWriter, r *http.Request) error {
+	token := r.Header.Get("Authorization")
+	if token == "" {
+		return oops.Unauthorized{
+			Err: errors.New("Auth token not found"),
+			Msg: "Auth token not found"}
+	}
+
+	if err := ac.service.Logout(token); err != nil {
+		return err
+	}
+	return reqres.HttpOk(w, http.StatusNoContent, nil)
 }
