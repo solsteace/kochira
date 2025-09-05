@@ -1,0 +1,19 @@
+# When a request goes here...
+:80 {
+    # Does the path starts with this? If yes, trim up to wildcard (*)
+    handle_path /account/* {
+        # Route the requests here
+        reverse_proxy server:8000
+    }
+
+    handle_path /link/* {
+        forward_auth server:8000 {
+            uri /api/v1/auth/infer
+
+            copy_headers X-User-Id
+        }
+        reverse_proxy server:8001 {
+            header_up test 123
+        }
+    }
+}

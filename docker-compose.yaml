@@ -1,24 +1,25 @@
 services:
-  # gateway:
-  #   image: caddy:2.10-alpine
-  #   ports:
-  #     - 8888:80
-  #   volumes:
-  #     - ./etc/caddy:/etc/caddy
-  #     - caddy-vol:/data
+  gateway:
+    image: caddy:alpine
+    ports:
+      - 8888:80
+    volumes:
+      - ./_etc/caddy:/etc/caddy
+      - caddy-vol:/data
 
   server:
-    ports:
-      - 8888:8888
     build:
       dockerfile: ./monolith/Dockerfile
       target: devel
     volumes:
       - ./account:/kochira/account
+      - ./link:/kochira/link
       - ./monolith:/kochira/monolith
       - ./lib:/kochira/lib
     env_file: 
       - path: "./account/.env"
+        required: true
+      - path: "./link/.env"
         required: true
   db:
     image: postgres:alpine
@@ -33,9 +34,7 @@ services:
     volumes:
       - cache-vol:/data
 
-
-
 volumes:
   db-vol:
   cache-vol:
-  # caddy-vol:
+  caddy-vol:
