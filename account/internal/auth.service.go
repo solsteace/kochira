@@ -175,3 +175,18 @@ func (as authService) Logout(token string) error {
 
 	return as.tokenCache.Revoke(payload.UserId)
 }
+
+func (as authService) Infer(token string) (
+	*struct{ UserId uint },
+	error,
+) {
+	result := new(struct{ UserId uint })
+
+	payload, err := as.accessToken.Decode(token)
+	if err != nil {
+		return result, err
+	}
+
+	result.UserId = payload.UserId
+	return result, nil
+}

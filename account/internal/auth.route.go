@@ -7,6 +7,7 @@ import (
 
 func UseAuth(parent *chi.Mux, controller authController) {
 	auth := chi.NewRouter()
+	auth.Get("/infer", reqres.HttpHandlerWithError(controller.Infer))
 	auth.Post("/register", reqres.HttpHandlerWithError(controller.Register))
 	auth.Post("/login", reqres.HttpHandlerWithError(controller.Login))
 	auth.Post("/refresh", reqres.HttpHandlerWithError(controller.Refresh))

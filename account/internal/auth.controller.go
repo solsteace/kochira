@@ -3,6 +3,7 @@ package internal
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/solsteace/go-lib/oops"
@@ -100,5 +101,22 @@ func (ac authController) Logout(w http.ResponseWriter, r *http.Request) error {
 	if err := ac.service.Logout(token); err != nil {
 		return err
 	}
+	return reqres.HttpOk(w, http.StatusNoContent, nil)
+}
+
+func (ac authController) Infer(w http.ResponseWriter, r *http.Request) error {
+	token := r.Header.Get("Authorization")
+	if token == "" {
+		return oops.Unauthorized{
+			Err: errors.New("Auth token not found"),
+			Msg: "Auth token not found"}
+	}
+
+	result, err := ac.service.Infer(token)
+	if err != nil {
+		return err
+	}
+
+	w.Header().Add("X-User-Id", fmt.Sprintf("%d", result.UserId))
 	return reqres.HttpOk(w, http.StatusNoContent, nil)
 }
