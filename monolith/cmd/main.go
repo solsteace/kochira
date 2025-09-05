@@ -1,8 +1,17 @@
 package main
 
-import "github.com/solsteace/kochira/account"
+import (
+	"github.com/solsteace/kochira/account"
+	"github.com/solsteace/kochira/link"
+)
 
 func main() {
+	done := make(chan struct{})
+
+	link.LoadEnv()
+	go link.RunApp()
 	account.LoadEnv()
-	account.RunApp()
+	go account.RunApp()
+
+	<-done
 }
