@@ -8,5 +8,4 @@ type User interface {
 
 	Create(a domain.User) error
 	Update(a domain.User) error
-	DeleteById(id uint) error
 }

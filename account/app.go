@@ -58,7 +58,7 @@ func RunApp() {
 		120*time.Second,
 		10*time.Second)
 
-	accountRepo := repository.NewPgAccount(dbClient)
+	accountRepo := repository.NewPgUser(dbClient)
 	authAttemptCache := cache.NewValkeyAuthAttempt(
 		cacheClient,
 		authAttemptDomainService.RetentionTime(15*time.Second))

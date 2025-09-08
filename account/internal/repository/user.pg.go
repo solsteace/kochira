@@ -16,15 +16,15 @@ type pgUserRow struct {
 	Email    string `db:"email"`
 }
 
-func (row pgUserRow) ToModel() domain.User {
-	return domain.User{
-		Id:       row.Id,
-		Username: row.Username,
-		Password: row.Password,
-		Email:    row.Email}
+func (row pgUserRow) ToUser() (domain.User, error) {
+	return domain.NewUser(
+		&row.Id,
+		row.Username,
+		row.Password,
+		row.Email)
 }
 
-func newPgAccountRow(a domain.User) pgUserRow {
+func newPgUserRow(a domain.User) pgUserRow {
 	return pgUserRow{
 		a.Id,
 		a.Username,
@@ -36,41 +36,43 @@ type pgUser struct {
 	db *sqlx.DB
 }
 
-func NewPgAccount(db *sqlx.DB) pgUser {
+func NewPgUser(db *sqlx.DB) pgUser {
 	return pgUser{db}
 }
 
 func (repo pgUser) GetById(id uint) (domain.User, error) {
-	row := new(pgUserRow)
-
-	query := "SELECT * FROM users WHERE id = $1"
+	row := new([]pgUserRow)
+	query := "SELECT * FROM users WHERE id = $1 LIMIT 1"
 	args := []any{id}
-	if err := repo.db.Select(&row, query, args); err != nil {
-		return domain.User{}, nil
+	if err := repo.db.Select(row, query, args...); err != nil {
+		return domain.User{}, err
 	}
 
-	return domain.User{}, nil
+	if len(*row) != 1 {
+		return domain.User{}, oops.NotFound{
+			Err: errors.New(fmt.Sprintf(
+				"user(id:%d) not found", id))}
+	}
+	return (*row)[0].ToUser()
 }
 
 func (repo pgUser) GetByUsername(username string) (domain.User, error) {
 	rows := new([]pgUserRow)
-
 	query := "SELECT * FROM users WHERE username = $1 LIMIT 1"
-	if err := repo.db.Select(rows, query, username); err != nil {
+	args := []any{username}
+	if err := repo.db.Select(rows, query, args...); err != nil {
 		return domain.User{}, err
 	}
 
-	if len(*rows) == 0 {
+	if len(*rows) != 1 {
 		return domain.User{}, oops.NotFound{
-			Err: errors.New(fmt.Sprintf("user with username(%s) not found", username)),
-			Msg: "user not found"}
+			Err: errors.New(fmt.Sprintf("user(username:%s) not found", username))}
 	}
-	return (*rows)[0].ToModel(), nil
+	return (*rows)[0].ToUser()
 }
 
 func (repo pgUser) Create(a domain.User) error {
-	row := newPgAccountRow(a)
-
+	row := newPgUserRow(a)
 	query := `
 		INSERT INTO users(
 			username,
@@ -83,13 +85,11 @@ func (repo pgUser) Create(a domain.User) error {
 	if _, err := repo.db.NamedExec(query, row); err != nil {
 		return err
 	}
-
 	return nil
 }
 
 func (repo pgUser) Update(a domain.User) error {
-	row := newPgAccountRow(a)
-
+	row := newPgUserRow(a)
 	query := `
 		UPDATE users 
 		SET
@@ -97,14 +97,9 @@ func (repo pgUser) Update(a domain.User) error {
 			password = :password,
 			email = :email
 		WHERE
-			id = :id `
+			id = :id`
 	if _, err := repo.db.NamedExec(query, row); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (repo pgUser) DeleteById(id uint) error {
 	return nil
 }
