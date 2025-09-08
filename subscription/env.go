@@ -1,0 +1,5 @@
+package subscription
+
+func LoadEnv() {
+
+}

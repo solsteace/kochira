@@ -5,7 +5,7 @@ Worry not, Kochira will ***show you the way*** to share links!
 
 ## Feature Roadmap
 
-- [ ] URL Shortener
+- [x] URL Shortener
 - [ ] Redirection Analysis
 - [ ] <strike>Pro Plans</strike> 😁
 
@@ -21,8 +21,10 @@ You could deploy this project in:
 <details>
   <summary>monolith</summary>
 
+  ![codebase-structure](./_docs/monolith.png)
+
   Run every service on a single container by:
-  
+
   - Ensure `monolith/Dockerfile` populates container's `go.work` with path of every directory with `go.mod` on it
   - Ensure `docker-compose.yaml` uses every `.env` on it (the env had prefixed by service, so you don't need to worry about conflict)
   - Ensure `docker-compose.yaml` uses `monolith/` Dockerfile
@@ -32,8 +34,10 @@ You could deploy this project in:
 <details>
   <summary>microservices</summary>
 
+  ![codebase-structure](./_docs/microservice.png)
+
   Run every service on their own container by:
-  
+
   - Ensure `<service>/Dockerfile` populates container's `go.work` with `lib` and `<service>` path
   - Ensure `docker-compose.yaml` uses service's `.env` on it (the env had prefixed by service, so you don't need to worry about conflict)
   - Ensure `docker-compose.yaml` uses `<service>/` Dockerfile
@@ -42,6 +46,8 @@ You could deploy this project in:
 
 <details>
   <summary>hybrid</summary>
+
+  ![codebase-structure](./_docs/hybrid.png)
 
   Run some in single container while the others are on their own by:
 
