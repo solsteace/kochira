@@ -3,8 +3,8 @@ package view
 import "time"
 
 type Link struct {
-	Id          uint
-	UserId      uint
+	Id          uint64
+	UserId      uint64
 	Shortened   string
 	Destination string
 	IsOpen      bool

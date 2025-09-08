@@ -11,7 +11,7 @@ import (
 
 const UserContextCtxKey = "userId"
 
-type UserContextCtxPayload uint
+type UserContextCtxPayload uint64
 
 type UserContext struct {
 	header string

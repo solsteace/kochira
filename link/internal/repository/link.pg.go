@@ -1,15 +1,31 @@
 package repository
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/solsteace/go-lib/oops"
 	"github.com/solsteace/kochira/link/internal/domain"
+	"github.com/solsteace/kochira/link/internal/view"
 )
 
-type pgLinkRow struct {
-	Id          uint      `db:"id"`
-	UserId      uint      `db:"user_id"`
+type pgLink struct {
+	db *sqlx.DB
+}
+
+func NewPgLink(db *sqlx.DB) pgLink {
+	return pgLink{db}
+}
+
+// ========================================
+// Queries
+// ========================================
+
+type pgViewLinkRow struct {
+	Id          uint64    `db:"id"`
+	UserId      uint64    `db:"user_id"`
 	Shortened   string    `db:"shortened"`
 	Destination string    `db:"destination"`
 	IsOpen      bool      `db:"is_open"`
@@ -17,7 +33,137 @@ type pgLinkRow struct {
 	ExpiredAt   time.Time `db:"expired_at"`
 }
 
-func (row pgLinkRow) toLink() (domain.Link, error) {
+func (row pgViewLinkRow) toView() view.Link {
+	return view.Link{
+		Id:          row.Id,
+		UserId:      row.UserId,
+		Shortened:   row.Shortened,
+		Destination: row.Destination,
+		IsOpen:      row.IsOpen,
+		UpdatedAt:   row.UpdatedAt,
+		ExpiredAt:   row.ExpiredAt}
+}
+
+func newPgViewLinkRow(l domain.Link) pgViewLinkRow {
+	return pgViewLinkRow{
+		Id:          l.Id(),
+		UserId:      l.UserId(),
+		Shortened:   l.Shortened(),
+		Destination: l.Destination(),
+		IsOpen:      l.IsOpen(),
+		UpdatedAt:   l.UpdatedAt(),
+		ExpiredAt:   l.ExpiredAt()}
+}
+
+func (repo pgLink) GetMany(q linkQueryParams) ([]view.Link, error) {
+	rows := new([]pgViewLinkRow)
+	query := `
+		SELECT * 
+		FROM "links" 
+		LIMIT $1 
+		OFFSET $2`
+	args := []any{
+		q.limit,
+		q.Offset()}
+	if err := repo.db.Select(rows, query, args...); err != nil {
+		return []view.Link{}, err
+	}
+
+	links := []view.Link{}
+	for _, r := range *rows {
+		links = append(links, r.toView())
+	}
+	return links, nil
+}
+
+func (repo pgLink) GetManyByUser(userId uint64, q linkQueryParams) ([]view.Link, error) {
+	rows := new([]pgViewLinkRow)
+	query := `
+		SELECT * 
+		FROM "links" 
+		WHERE user_id = $1
+		LIMIT $2
+		OFFSET $3`
+	args := []any{userId, q.limit, q.Offset()}
+	if err := repo.db.Select(rows, query, args...); err != nil {
+		return []view.Link{}, err
+	}
+
+	links := []view.Link{}
+	for _, r := range *rows {
+		links = append(links, r.toView())
+	}
+	return links, nil
+}
+
+func (repo pgLink) GetById(id uint64) (view.Link, error) {
+	rows := new([]pgViewLinkRow)
+	query := `
+		SELECT * 
+		FROM links 
+		WHERE id = $1 
+		LIMIT 1`
+	args := []any{id}
+	if err := repo.db.Select(rows, query, args...); err != nil {
+		return view.Link{}, err
+	}
+
+	if len(*rows) != 1 {
+		return view.Link{}, oops.NotFound{
+			Err: errors.New(
+				fmt.Sprintf("link(id: %d) not found", id))}
+	}
+	return (*rows)[0].toView(), nil
+}
+
+func (repo pgLink) CountByUserId(userId uint64) (uint, error) {
+	query := `SELECT COUNT(*) as n_links FROM links WHERE user_id = ?`
+	args := []any{userId}
+	result := repo.db.QueryRow(query, args)
+	if result.Err() != nil {
+		return 0, result.Err()
+	}
+
+	var count uint = 0
+	if err := result.Scan(count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (repo pgLink) FindRedirection(shortened string) (view.Link, error) {
+	rows := new([]pgViewLinkRow)
+	query := `
+		SELECT * FROM "links"
+		WHERE shortened = $1
+		LIMIT 1`
+	args := []any{shortened}
+	if err := repo.db.Select(rows, query, args...); err != nil {
+		return view.Link{}, err
+	}
+
+	if len(*rows) != 1 {
+		return view.Link{}, oops.NotFound{
+			Err: errors.New(
+				fmt.Sprintf("link(shortened: %s) not found", shortened))}
+	}
+	return (*rows)[0].toView(), nil
+}
+
+// ========================================
+// COMMANDS
+// ========================================
+type pgDomainLinkRow struct {
+	Id          uint64    `db:"id"`
+	UserId      uint64    `db:"user_id"`
+	Shortened   string    `db:"shortened"`
+	Destination string    `db:"destination"`
+	IsOpen      bool      `db:"is_open"`
+	UpdatedAt   time.Time `db:"updated_at"`
+	ExpiredAt   time.Time `db:"expired_at"`
+}
+
+func (row pgDomainLinkRow) toLink() (domain.Link, error) {
 	return domain.NewLink(
 		&row.Id,
 		row.UserId,
@@ -28,69 +174,38 @@ func (row pgLinkRow) toLink() (domain.Link, error) {
 		row.ExpiredAt)
 }
 
-type pgLink struct {
-	db *sqlx.DB
+func newPgDomainLinkRow(l domain.Link) pgDomainLinkRow {
+	return pgDomainLinkRow{
+		Id:          l.Id(),
+		UserId:      l.UserId(),
+		Shortened:   l.Shortened(),
+		Destination: l.Destination(),
+		IsOpen:      l.IsOpen(),
+		UpdatedAt:   l.UpdatedAt(),
+		ExpiredAt:   l.ExpiredAt()}
 }
 
-func NewPgLink(db *sqlx.DB) pgLink {
-	return pgLink{db}
-}
-
-func (repo pgLink) GetMany(q linkQueryParams) ([]domain.Link, error) {
+func (repo pgLink) Load(id uint64) (domain.Link, error) {
+	rows := new([]pgDomainLinkRow)
 	query := `
 		SELECT * 
-		FROM "links"
-		LIMIT ?
-		OFFSET ?`
-	args := []any{
-		q.limit,
-		q.Offset()}
-
-	rows := new([]pgLinkRow)
-	if err := repo.db.Select(rows, query, args); err != nil {
-		return []domain.Link{}, err
-	}
-
-	links := []domain.Link{}
-	for _, r := range *rows {
-		l, err := r.toLink()
-		if err != nil {
-			return []domain.Link{}, err
-		}
-		links = append(links, l)
-	}
-	return links, nil
-}
-
-func (repo pgLink) GetById(id uint) (domain.Link, error) {
-	query := `
-		SELECT *
-		FROM "links"
-		WHERE id = ? `
+		FROM links 
+		WHERE id = $1 
+		LIMIT 1`
 	args := []any{id}
-
-	row := new(pgLinkRow)
-	if err := repo.db.Select(row, query, args); err != nil {
+	if err := repo.db.Select(rows, query, args...); err != nil {
 		return domain.Link{}, err
 	}
-	return row.toLink()
-}
 
-func (repo pgLink) GetByShortened(shortened string) (domain.Link, error) {
-	query := `
-		SELECT *
-		FROM "links"
-		WHERE shortened = ?`
-	args := []any{shortened}
-
-	row := new(pgLinkRow)
-	if err := repo.db.Select(row, query, args); err != nil {
-		return domain.Link{}, err
+	if len(*rows) != 1 {
+		return domain.Link{}, oops.NotFound{
+			Err: errors.New(
+				fmt.Sprintf("link(id: %d) not found", id))}
 	}
-	return row.toLink()
+	return (*rows)[0].toLink()
 }
 
-func (repo pgLink) Create(l domain.Link) error {
+func (repo pgLink) Create(l domain.Link) (uint64, error) {
 	query := `
 		INSERT INTO "links"(
 			user_id,
@@ -100,18 +215,27 @@ func (repo pgLink) Create(l domain.Link) error {
 			updated_at,
 			expired_at)
 		VALUES (
-			:userId, 
+			:user_id, 
 			:shortened, 
 			:destination, 
 			:is_open, 
-			:updatedAt, 
-			:expiredAt)`
-
-	_, err := repo.db.Exec(query, l)
+			:updated_at, 
+			:expired_at)
+		RETURNING id`
+	link := newPgDomainLinkRow(l)
+	row, err := repo.db.NamedQuery(query, link)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+
+	row.Next()
+	defer row.Close()
+	var insertId uint64 = 0
+	if err := row.Scan(&insertId); err != nil {
+		return 0, err
+	}
+
+	return insertId, nil
 }
 
 func (repo pgLink) Update(l domain.Link) error {
@@ -120,27 +244,26 @@ func (repo pgLink) Update(l domain.Link) error {
 		SET 
 			shortened = :shortened,
 			destination = :destination,
-			is_open = :isOpen,
-			updated_at = :updatedAt,
-			expired_at = :expiredAt
+			is_open = :is_open,
+			updated_at = :updated_at,
+			expired_at = :expired_at
 		WHERE
 			id = :id`
-
-	_, err := repo.db.Exec(query, l)
+	link := newPgDomainLinkRow(l)
+	_, err := repo.db.NamedExec(query, link)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (repo pgLink) DeleteById(id uint) error {
+func (repo pgLink) DeleteById(id uint64) error {
 	query := `
 		DELETE 
 		FROM "links"
-		WHERE id = ?`
+		WHERE id = $1`
 	args := []any{id}
-
-	_, err := repo.db.Exec(query, args)
+	_, err := repo.db.Exec(query, args...)
 	if err != nil {
 		return err
 	}

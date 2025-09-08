@@ -42,6 +42,7 @@ func RunApp() {
 	app.Use(chiMiddleware.Recoverer)
 
 	v1 := chi.NewRouter()
+	internal.UseRedirection(v1, linkController)
 	internal.UseLink(v1, linkController, userContext)
 
 	app.Mount("/api/v1", v1)

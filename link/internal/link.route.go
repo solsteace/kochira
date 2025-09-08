@@ -12,16 +12,15 @@ func UseLink(
 	userContext middleware.UserContext,
 ) {
 	link := chi.NewRouter()
-
 	link.Group(func(r chi.Router) {
 		r.Use(userContext.Handle)
 
 		// Put user context middleware
-		r.Get("/my/{id}", reqres.HttpHandlerWithError(controller.GetById))
 		r.Get("/my", reqres.HttpHandlerWithError(controller.GetSelf))
-		r.Post("/{id}", reqres.HttpHandlerWithError(controller.Create))
+		r.Get("/my/{id}", reqres.HttpHandlerWithError(controller.GetById))
+		r.Post("/", reqres.HttpHandlerWithError(controller.Create))
 		r.Put("/{id}", reqres.HttpHandlerWithError(controller.UpdateById))
 		r.Delete("/{id}", reqres.HttpHandlerWithError(controller.DeleteById))
 	})
-	link.Get("/{shotened}", reqres.HttpHandlerWithError(controller.Redirect))
+	parent.Mount("/link", link)
 }

@@ -1,13 +1,32 @@
 package repository
 
-import "github.com/solsteace/kochira/link/internal/domain"
+import (
+	"github.com/solsteace/kochira/link/internal/domain"
+	"github.com/solsteace/kochira/link/internal/view"
+)
 
 type Link interface {
-	GetMany(q linkQueryParams) ([]domain.Link, error)
-	GetById(id uint) (domain.Link, error)
-	Create(l domain.Link) error
+	// Queries ============
+
+	// Retrieves many links
+	GetMany(q linkQueryParams) ([]view.Link, error)
+
+	GetManyByUser(userId uint64, q linkQueryParams) ([]view.Link, error)
+
+	GetById(id uint64) (view.Link, error)
+
+	// Retrieves the number of links owned by user
+	CountByUserId(userId uint64) (uint, error)
+
+	// Retrieves active redirection link. That is, link that is open and not expired yet
+	FindRedirection(shortened string) (view.Link, error)
+
+	// Commands ===========
+
+	Load(id uint64) (domain.Link, error)
+	Create(l domain.Link) (uint64, error)
 	Update(l domain.Link) error
-	DeleteById(id uint) error
+	DeleteById(id uint64) error
 }
 
 type linkQueryParams struct {
