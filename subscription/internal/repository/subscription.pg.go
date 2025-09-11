@@ -49,7 +49,18 @@ func (repo pgSubscription) GetByOwner(id uint64) (domain.Subscription, error) {
 	return row.ToDomain()
 }
 
-func (repo pgSubscription) Create(s domain.Subscription) error {
+func (repo pgSubscription) Create(subscriptions []domain.Subscription) error {
+	rows := []pgSubscriptionRow{}
+	for _, s := range subscriptions {
+		rows = append(rows, newPgSubscriptionRow(s))
+	}
+
+	query := `
+		INSERT INTO subscriptions(user_id, expired_at)
+		VALUES (:user_id, :expired_at)`
+	if _, err := repo.db.NamedExec(query, rows); err != nil {
+		return err
+	}
 	return nil
 }
 

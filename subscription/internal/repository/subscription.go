@@ -7,7 +7,7 @@ type Subscription interface {
 	GetByOwner(id uint64) (domain.Subscription, error)
 
 	// Command
-	Create(s domain.Subscription) error
+	Create(s []domain.Subscription) error
 	Update(s domain.Subscription) error
 	Delete(userId uint64) error
 }

@@ -16,14 +16,14 @@ services:
       - ./link:/kochira/link
       - ./monolith:/kochira/monolith
       - ./lib:/kochira/lib
-      # - ./subscription:/kochira/subscription
+      - ./subscription:/kochira/subscription
     env_file: 
       - path: "./account/.env"
         required: true
       - path: "./link/.env"
         required: true
-      # - path: "./subscription/.env"
-      #   required: true
+      - path: "./subscription/.env"
+        required: true
   db:
     image: postgres:alpine
     volumes:

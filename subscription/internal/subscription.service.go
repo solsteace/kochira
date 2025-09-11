@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"time"
+
 	"github.com/solsteace/kochira/subscription/internal/domain"
 	"github.com/solsteace/kochira/subscription/internal/repository"
 )
@@ -19,6 +21,23 @@ func (ss SubscriptionService) GetByUserId(id uint64) (domain.Subscription, error
 
 func (ss SubscriptionService) InferPerks(userId uint64) {
 
+}
+
+func (ss SubscriptionService) Init(userId []uint64) error {
+	now := time.Now()
+	subscriptions := []domain.Subscription{}
+	for _, uId := range userId {
+		s, err := domain.NewSubscription(
+			nil,
+			uId,
+			now)
+		if err != nil {
+			return err
+		}
+		subscriptions = append(subscriptions, s)
+	}
+
+	return ss.repo.Create(subscriptions)
 }
 
 func (ss SubscriptionService) Order(

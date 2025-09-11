@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -107,7 +108,7 @@ func RunApp() {
 	msgs, err := ch.Consume(
 		queue.Name, // queue: which queue we're receiving messages from?
 		"",         // consumer: what name should I identify myself with?
-		true,       // auto-ack: upon receiving message, should it be ACK-ed automatically?
+		false,      // auto-ack: upon receiving message, should it be ACK-ed automatically?
 		false,      // exclusive
 		false,      // no-local
 		false,      // no-wait
@@ -115,7 +116,20 @@ func RunApp() {
 	)
 	go func() {
 		for msg := range msgs {
-			fmt.Println(msg)
+			payload := new(struct {
+				Users []uint64 `json:"users"`
+			})
+			if err := json.Unmarshal(msg.Body, &payload); err != nil {
+				log.Printf("Failed to unmarshal data: %v\n", err)
+			}
+
+			if err := subscriptionService.Init(payload.Users); err != nil {
+				log.Printf("Failed to init users: %v\n", err)
+			}
+
+			if err := msg.Ack(false); err != nil {
+				log.Printf("Failed to ACK messages: %v\n", err)
+			}
 		}
 	}()
 
