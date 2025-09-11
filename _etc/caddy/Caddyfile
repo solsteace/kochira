@@ -16,6 +16,15 @@
         reverse_proxy server:8001
     }
 
+    handle_path /subscription/* {
+        forward_auth server:8000 {
+            uri /api/v1/auth/infer
+            copy_headers X-User-Id
+        }
+
+        reverse_proxy server:8002
+    }
+
     handle_path /* {
         rewrite * /api/v1{uri}
         reverse_proxy server:8001

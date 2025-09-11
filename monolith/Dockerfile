@@ -1,11 +1,12 @@
-FROM golang:1.24.6-alpine AS base
+FROM golang:alpine AS base
 WORKDIR /kochira
-RUN mkdir ./monolith ./lib ./account ./link
+RUN mkdir ./monolith ./lib ./account ./link ./subscription
 COPY ./monolith/go.* ./monolith
 COPY ./account/go.* ./account
 COPY ./link/go.* ./link
+COPY ./subscription/go.* ./subscription
 COPY ./lib/go.*  ./lib
-RUN go work init && go work use ./monolith ./lib ./account ./link
+RUN go work init && go work use ./monolith ./lib ./account ./link ./subscription
 
 
 FROM alpine/curl:latest AS devtools
