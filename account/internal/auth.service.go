@@ -61,30 +61,19 @@ func (as authService) Register(username, password, email string) error {
 	return nil
 }
 
-func (as authService) Login(username, password string) (
-	*struct {
-		RefreshToken string
-		AccessToken  string
-	},
-	error,
-) {
-	result := new(struct {
-		RefreshToken string
-		AccessToken  string
-	})
-
+func (as authService) Login(username, password string) (string, string, error) {
 	user, err := as.userRepo.GetByUsername(username)
 	if err != nil {
-		return result, err
+		return "", "", err
 	}
 
 	attempts, err := as.authAttemptCache.Get(user.Id)
 	if err != nil {
-		return result, err
+		return "", "", err
 	}
 	jailTime := as.authAttemptService.CalculateJailTime(attempts)
 	if jailTime > 0 {
-		return result, oops.Unauthorized{
+		return "", "", oops.Unauthorized{
 			Msg: fmt.Sprintf(
 				"Failed too many times! Try again in %.2fs", jailTime.Seconds())}
 	}
@@ -92,80 +81,63 @@ func (as authService) Login(username, password string) (
 	if err := as.secret.Compare(user.Password, password); err != nil {
 		attempt, _ := domain.NewAuthAttempt(false, time.Now())
 		if err := as.authAttemptCache.Add(user.Id, attempt); err != nil {
-			return result, err
+			return "", "", err
 		}
-		return result, err
+		return "", "", err
 	}
 	attempt, _ := domain.NewAuthAttempt(true, time.Now())
 	if err := as.authAttemptCache.Add(user.Id, attempt); err != nil {
-		return result, err
+		return "", "", err
 	}
 
 	accessToken, err := as.accessToken.Encode(token.NewAuth(user.Id))
 	if err != nil {
-		return result, err
+		return "", "", err
 	}
 	refreshToken, err := as.refreshToken.Encode(token.NewAuth(user.Id))
 	if err != nil {
-		return result, err
+		return "", "", err
 	}
 
 	if err := as.tokenCache.Grant(user.Id, refreshToken); err != nil {
-		return result, err
+		return "", "", err
 	}
-
-	result.RefreshToken = refreshToken
-	result.AccessToken = accessToken
-	return result, nil
+	return accessToken, refreshToken, nil
 }
 
-func (as authService) Refresh(token string) (
-	*struct {
-		RefreshToken string
-		AccessToken  string
-	},
-	error,
-) {
-	result := new(struct {
-		RefreshToken string
-		AccessToken  string
-	})
-
+func (as authService) Refresh(token string) (string, string, error) {
 	payload, err := as.refreshToken.Decode(token)
 	if err != nil {
-		return result, err
+		return "", "", err
 	}
 
 	oldToken, err := as.tokenCache.FindByOwner(payload.UserId)
 	switch {
 	case err != nil:
-		return result, err
+		return "", "", err
 	case oldToken == "":
-		return result, oops.Unauthorized{
+		return "", "", oops.Unauthorized{
 			Err: errors.New("Active refresh token not found"),
 			Msg: "Active refresh token not found"}
 	case oldToken != token:
-		return result, oops.Unauthorized{
+		return "", "", oops.Unauthorized{
 			Err: errors.New("Given token does not match with the active one"),
 			Msg: "Given token does not match with the active one"}
 	}
 
 	accessToken, err := as.accessToken.Encode(*payload)
 	if err != nil {
-		return result, err
+		return "", "", err
 	}
 	refreshToken, err := as.refreshToken.Encode(*payload)
 	if err != nil {
-		return result, err
+		return "", "", err
 	}
 
 	if err := as.tokenCache.Grant(payload.UserId, refreshToken); err != nil {
-		return result, err
+		return "", "", err
 	}
-
-	result.AccessToken = accessToken
-	result.RefreshToken = refreshToken
-	return result, nil
+	return accessToken, refreshToken, nil
 }
 
 func (as authService) Logout(token string) error {
@@ -177,18 +149,13 @@ func (as authService) Logout(token string) error {
 	return as.tokenCache.Revoke(payload.UserId)
 }
 
-func (as authService) Infer(token string) (
-	*struct{ UserId uint },
-	error,
-) {
-	result := new(struct{ UserId uint })
+func (as authService) Infer(token string) (uint64, error) {
 	payload, err := as.accessToken.Decode(token)
 	if err != nil {
-		return result, err
+		return 0, err
 	}
 
-	result.UserId = payload.UserId
-	return result, nil
+	return uint64(payload.UserId), nil
 }
 
 func (as authService) HandleNewUsers(

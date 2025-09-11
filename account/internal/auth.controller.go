@@ -30,15 +30,15 @@ func (ac authController) Login(w http.ResponseWriter, r *http.Request) error {
 	}
 	defer r.Body.Close()
 
-	result, err := ac.service.Login(reqPayload.Username, reqPayload.Password)
+	accessToken, refreshToken, err := ac.service.Login(reqPayload.Username, reqPayload.Password)
 	if err != nil {
 		return err
 	}
 
 	resPayload := map[string]any{
 		"token": map[string]any{
-			"access":  result.AccessToken,
-			"refresh": result.RefreshToken}}
+			"access":  accessToken,
+			"refresh": refreshToken}}
 	return reqres.HttpOk(w, http.StatusOK, resPayload)
 }
 
@@ -78,15 +78,15 @@ func (ac authController) Refresh(w http.ResponseWriter, r *http.Request) error {
 	}
 	defer r.Body.Close()
 
-	result, err := ac.service.Refresh(reqPayload.Token)
+	accessToken, refreshToken, err := ac.service.Refresh(reqPayload.Token)
 	if err != nil {
 		return err
 	}
 
 	resPayload := map[string]any{
 		"token": map[string]any{
-			"access":  result.AccessToken,
-			"refresh": result.RefreshToken}}
+			"access":  accessToken,
+			"refresh": refreshToken}}
 	return reqres.HttpOk(w, http.StatusOK, resPayload)
 }
 
@@ -112,11 +112,11 @@ func (ac authController) Infer(w http.ResponseWriter, r *http.Request) error {
 			Msg: "Auth token not found"}
 	}
 
-	result, err := ac.service.Infer(token)
+	userId, err := ac.service.Infer(token)
 	if err != nil {
 		return err
 	}
 
-	w.Header().Add("X-User-Id", fmt.Sprintf("%d", result.UserId))
+	w.Header().Add("X-User-Id", fmt.Sprintf("%d", userId))
 	return reqres.HttpOk(w, http.StatusNoContent, nil)
 }
