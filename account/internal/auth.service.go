@@ -10,6 +10,7 @@ import (
 	"github.com/solsteace/go-lib/token"
 	"github.com/solsteace/kochira/account/internal/cache"
 	"github.com/solsteace/kochira/account/internal/domain"
+	"github.com/solsteace/kochira/account/internal/domain/outbox"
 	domainService "github.com/solsteace/kochira/account/internal/domain/service"
 	"github.com/solsteace/kochira/account/internal/repository"
 )
@@ -181,7 +182,6 @@ func (as authService) Infer(token string) (
 	error,
 ) {
 	result := new(struct{ UserId uint })
-
 	payload, err := as.accessToken.Decode(token)
 	if err != nil {
 		return result, err
@@ -189,4 +189,23 @@ func (as authService) Infer(token string) (
 
 	result.UserId = payload.UserId
 	return result, nil
+}
+
+func (as authService) HandleNewUsers(
+	maxCount uint,
+	handleFx func(o []outbox.Register) ([]uint64, error),
+) error {
+	outbox, err := as.userRepo.GetRegisterOutbox(maxCount)
+	if err != nil {
+		return err
+	}
+	if len(outbox) == 0 {
+		return nil
+	}
+
+	sentOutbox, err := handleFx(outbox)
+	if err != nil {
+		return err
+	}
+	return as.userRepo.ResolveRegisterOutbox(sentOutbox)
 }

@@ -16,11 +16,14 @@ services:
       - ./link:/kochira/link
       - ./monolith:/kochira/monolith
       - ./lib:/kochira/lib
+      # - ./subscription:/kochira/subscription
     env_file: 
       - path: "./account/.env"
         required: true
       - path: "./link/.env"
         required: true
+      # - path: "./subscription/.env"
+      #   required: true
   db:
     image: postgres:alpine
     volumes:
@@ -33,8 +36,19 @@ services:
     image: valkey/valkey:alpine
     volumes:
       - cache-vol:/data
+  mq:
+    ports:
+      - 8889:15672
+    image: rabbitmq:management-alpine
+    volumes:
+      - mq-vol:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: kochira
+      RABBITMQ_DEFAULT_PASS: i_know
+
 
 volumes:
   db-vol:
   cache-vol:
+  mq-vol:
   caddy-vol:

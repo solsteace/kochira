@@ -11,6 +11,7 @@ var (
 
 	envCacheUrl string
 	envDbUrl    string
+	envMqUrl    string
 
 	envTokenIssuer          string
 	envTokenSecret          string
@@ -30,6 +31,7 @@ func LoadEnv() {
 
 	envCacheUrl = os.Getenv("ACCOUNT_CACHE_URL")
 	envDbUrl = os.Getenv("ACCOUNT_DB_URL")
+	envMqUrl = os.Getenv("ACCOUNT_MQ_URL")
 
 	envTokenIssuer = os.Getenv("ACCOUNT_TOKEN_ISSUER")
 	envTokenSecret = os.Getenv("ACCOUNT_TOKEN_SECRET")

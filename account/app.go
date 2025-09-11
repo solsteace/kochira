@@ -1,6 +1,8 @@
 package account
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,12 +11,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	_ "github.com/jackc/pgx/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
+	"github.com/rabbitmq/amqp091-go"
 	"github.com/solsteace/go-lib/reqres"
 	"github.com/solsteace/go-lib/token"
 	account "github.com/solsteace/kochira/account/internal"
 	"github.com/solsteace/kochira/account/internal/cache"
+	"github.com/solsteace/kochira/account/internal/domain/outbox"
 	domainService "github.com/solsteace/kochira/account/internal/domain/service"
 	"github.com/solsteace/kochira/account/internal/repository"
 	"github.com/solsteace/kochira/account/internal/utility"
@@ -25,9 +31,18 @@ func RunApp() {
 	// ========================================
 	// Utils
 	// ========================================
-	dbClient, err := sqlx.Connect("pgx", envDbUrl)
+	// Props to: https://medium.com/@lokeahnming/that-time-i-took-down-my-production-site-with-too-many-database-connections-8758406445e5
+	dbCfg, err := pgx.ParseConfig(envDbUrl)
 	if err != nil {
 		log.Fatalf("Error during connecting to DB: %v", err)
+	}
+	dbClient := sqlx.NewDb(stdlib.OpenDB(*dbCfg), "pgx")
+	dbClient.SetMaxOpenConns(25) // Based on your db's connection limit
+	dbClient.SetMaxIdleConns(10)
+	dbClient.SetConnMaxLifetime(30 * time.Minute) // Replace connections periodically
+	dbClient.SetConnMaxIdleTime(30 * time.Second) // Close connections that aren't being used
+	if err := dbClient.Ping(); err != nil {
+		log.Fatalf("Error during Ping attempt: %v", err)
 	}
 	defer dbClient.Close()
 
@@ -106,6 +121,72 @@ func RunApp() {
 				map[string]any{
 					"msg": "The endpoint you're reaching wasn't found"})
 		}))
+
+	// ========================================
+	// Side effects, susbcriptions
+	// ========================================
+	mqClient, err := amqp091.Dial(envMqUrl)
+	if err != nil {
+		log.Fatalf("Failed to connect to mq:%+v", err)
+	}
+	ch, err := mqClient.Channel()
+	if err != nil {
+		log.Fatalf("Failed to open a channel:%+v", err)
+	}
+	queue, err := ch.QueueDeclare(
+		"hello", // name: what's the name of the queue we're going to use?
+		false,   // durable: [read function doc]
+		false,   // delete [read function doc]
+		false,   // exclusive: can this queue be accessed using other connection (channel, I guess)?
+		false,   // no-wait: should we assume this queue had already been declared on the broker?
+		nil,     // arguments
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare a queue:%+v", queue)
+	}
+
+	go func() {
+		handle := func(outboxes []outbox.Register) ([]uint64, error) {
+			userId := []uint64{}
+			outboxId := []uint64{}
+			for _, o := range outboxes {
+				userId = append(userId, o.UserId())
+				outboxId = append(outboxId, o.Id())
+			}
+
+			payload := map[string]any{
+				"users": userId}
+			body, err := json.Marshal(payload)
+			if err != nil {
+				return []uint64{}, err
+			}
+
+			ctx := context.Background() // Use the default one, for now
+			err = ch.PublishWithContext(
+				ctx,
+				"",
+				queue.Name,
+				false,
+				false,
+				amqp091.Publishing{
+					ContentType: "application/json",
+					Body:        body})
+			if err != nil {
+				return []uint64{}, err
+			}
+			return outboxId, nil
+		}
+
+		t := time.NewTicker(time.Second * 2)
+		for {
+			select {
+			case <-t.C:
+				if err := authService.HandleNewUsers(20, handle); err != nil {
+					fmt.Println(err)
+				}
+			}
+		}
+	}()
 
 	// ========================================
 	// Init
