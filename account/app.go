@@ -2,7 +2,6 @@ package account
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/solsteace/go-lib/reqres"
+	"github.com/solsteace/go-lib/temporary/messaging"
 	"github.com/solsteace/go-lib/token"
 	account "github.com/solsteace/kochira/account/internal"
 	"github.com/solsteace/kochira/account/internal/cache"
@@ -148,15 +148,11 @@ func RunApp() {
 	go func() {
 		handle := func(outboxes []outbox.Register) ([]uint64, error) {
 			userId := []uint64{}
-			outboxId := []uint64{}
 			for _, o := range outboxes {
 				userId = append(userId, o.UserId())
-				outboxId = append(outboxId, o.Id())
 			}
 
-			payload := map[string]any{
-				"users": userId}
-			body, err := json.Marshal(payload)
+			body, err := messaging.SerCreateSubscription(userId)
 			if err != nil {
 				return []uint64{}, err
 			}
@@ -174,7 +170,7 @@ func RunApp() {
 			if err != nil {
 				return []uint64{}, err
 			}
-			return outboxId, nil
+			return userId, nil
 		}
 
 		t := time.NewTicker(time.Second * 2)

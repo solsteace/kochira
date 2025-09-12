@@ -157,7 +157,7 @@ func (repo pgUser) ResolveRegisterOutbox(id []uint64) error {
 	query, args, err := sqlx.In(`
 		UPDATE register_outbox
 		SET is_done = true
-		WHERE id IN (?)`, id)
+		WHERE user_id IN (?)`, id)
 	if err != nil {
 		return err
 	}
