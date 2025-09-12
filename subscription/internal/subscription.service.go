@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"slices"
 	"time"
 
 	"github.com/solsteace/kochira/subscription/internal/domain"
@@ -24,13 +25,21 @@ func (ss SubscriptionService) InferPerks(userId uint64) {
 }
 
 func (ss SubscriptionService) Init(userId []uint64) error {
+	existingSubscriptions, err := ss.repo.CheckManyByOwner(userId)
+	if err != nil {
+		return err
+	}
+
 	now := time.Now()
 	subscriptions := []domain.Subscription{}
 	for _, uId := range userId {
-		s, err := domain.NewSubscription(
-			nil,
-			uId,
-			now)
+		// Number of new users within small time window (say, 2 - 3 seconds) won't
+		// be large enough, so using linear search would be okay for now
+		if slices.Contains(existingSubscriptions, uId) {
+			continue
+		}
+
+		s, err := domain.NewSubscription(nil, uId, now)
 		if err != nil {
 			return err
 		}

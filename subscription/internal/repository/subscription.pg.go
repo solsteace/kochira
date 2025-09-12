@@ -35,6 +35,23 @@ func NewPgSubscription(db *sqlx.DB) pgSubscription {
 	return pgSubscription{db}
 }
 
+func (repo pgSubscription) CheckManyByOwner(id []uint64) ([]uint64, error) {
+	query, args, err := sqlx.In(`
+		SELECT user_id 
+		FROM subscriptions
+		WHERE user_id IN (?)`, id)
+	if err != nil {
+		return []uint64{}, err
+	}
+
+	foundId := new([]uint64)
+	if err := repo.db.Select(foundId, repo.db.Rebind(query), args...); err != nil {
+		return []uint64{}, err
+	}
+
+	return *foundId, nil
+}
+
 func (repo pgSubscription) GetByOwner(id uint64) (domain.Subscription, error) {
 	row := new(pgSubscriptionRow)
 	query := `

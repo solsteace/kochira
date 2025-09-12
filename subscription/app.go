@@ -1,7 +1,6 @@
 package subscription
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/solsteace/go-lib/reqres"
+	"github.com/solsteace/go-lib/temporary/messaging"
 	"github.com/solsteace/kochira/subscription/internal"
 	"github.com/solsteace/kochira/subscription/internal/domain/service"
 	"github.com/solsteace/kochira/subscription/internal/middleware"
@@ -116,19 +116,19 @@ func RunApp() {
 	)
 	go func() {
 		for msg := range msgs {
-			payload := new(struct {
-				Users []uint64 `json:"users"`
-			})
-			if err := json.Unmarshal(msg.Body, &payload); err != nil {
-				log.Printf("Failed to unmarshal data: %v\n", err)
+			payload, err := messaging.DeCreateSubscription(msg.Body)
+			if err != nil {
+				log.Printf("Failed to deserialize message: %v\n", err)
+				continue
 			}
 
-			if err := subscriptionService.Init(payload.Users); err != nil {
+			if err := subscriptionService.Init(payload.Data.Users); err != nil {
 				log.Printf("Failed to init users: %v\n", err)
+				continue
 			}
 
 			if err := msg.Ack(false); err != nil {
-				log.Printf("Failed to ACK messages: %v\n", err)
+				log.Printf("Failed to ACK message: %v\n", err)
 			}
 		}
 	}()
