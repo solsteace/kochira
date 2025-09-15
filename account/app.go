@@ -18,6 +18,7 @@ import (
 	"github.com/solsteace/go-lib/reqres"
 	"github.com/solsteace/go-lib/temporary/messaging"
 	"github.com/solsteace/go-lib/token"
+	"github.com/solsteace/kochira/account/internal"
 	account "github.com/solsteace/kochira/account/internal"
 	"github.com/solsteace/kochira/account/internal/cache"
 	"github.com/solsteace/kochira/account/internal/domain/outbox"
@@ -89,7 +90,7 @@ func RunApp() {
 		accessTokenHandler,
 		refreshTokenHandler,
 		authAttemptDomainService)
-	authController := account.NewAuthController(authService)
+	authRoute := internal.NewAuthRoute(authService)
 
 	// ========================================
 	// Routings
@@ -99,7 +100,7 @@ func RunApp() {
 	app.Use(middleware.Recoverer)
 
 	v1 := chi.NewRouter()
-	account.UseAuth(v1, authController)
+	authRoute.Use(v1)
 
 	app.Mount("/api/v1", v1)
 	app.Get("/health", reqres.HttpHandlerWithError(

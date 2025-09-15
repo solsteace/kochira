@@ -32,7 +32,8 @@ func RunApp() {
 	// ========================================
 	linkRepo := repository.NewPgLink(dbClient)
 	linkService := internal.NewLinkService(linkRepo)
-	linkController := internal.NewLinkController(linkService)
+	linkRoute := internal.NewLinkRoute(linkService, userContext)
+	redirectionRoute := internal.NewRedirectionRoute(linkService)
 
 	// ========================================
 	// Routings
@@ -42,8 +43,8 @@ func RunApp() {
 	app.Use(chiMiddleware.Recoverer)
 
 	v1 := chi.NewRouter()
-	internal.UseRedirection(v1, linkController)
-	internal.UseLink(v1, linkController, userContext)
+	linkRoute.Use(v1)
+	redirectionRoute.Use(v1)
 
 	app.Mount("/api/v1", v1)
 	app.Get("/health", reqres.HttpHandlerWithError(

@@ -48,7 +48,7 @@ func RunApp() {
 
 	subscriptionRepo := repository.NewPgSubscription(dbClient)
 	subscriptionService := internal.NewSubscriptionService(subscriptionRepo, subscriptionPerks)
-	subscriptionController := internal.NewSubscriptionController(subscriptionService)
+	subscriptionRoute := internal.NewSubscriptionRoute(subscriptionService, userContext)
 
 	// ================================
 	// Routes
@@ -58,7 +58,7 @@ func RunApp() {
 	app.Use(chiMiddleware.Recoverer)
 
 	v1 := chi.NewRouter()
-	internal.UseSubscription(v1, subscriptionController, userContext)
+	subscriptionRoute.Use(v1)
 
 	app.Mount("/api/v1", v1)
 	app.Get("/health", reqres.HttpHandlerWithError(
