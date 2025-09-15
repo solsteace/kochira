@@ -1,6 +1,10 @@
 package service
 
-import "time"
+import (
+	"time"
+
+	"github.com/solsteace/kochira/subscription/internal/domain"
+)
 
 type perks struct {
 	expiration time.Duration
@@ -32,8 +36,9 @@ func NewSubscriptionPerks(
 	return SubscriptionPerks{basic, premium, deviation}
 }
 
-func (l SubscriptionPerks) Infer(subscriptionExpiration time.Time) (time.Duration, uint) {
-	diff := subscriptionExpiration.Sub(time.Now()) - l.deviation
+func (l SubscriptionPerks) Infer(subscription domain.Subscription) (time.Duration, uint) {
+	expiration := subscription.ExpiredAt()
+	diff := expiration.Sub(time.Now()) - l.deviation
 	if diff <= 0 {
 		return l.premium.expiration, l.premium.linkLimit
 	}

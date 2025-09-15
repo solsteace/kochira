@@ -5,23 +5,32 @@ import (
 	"time"
 
 	"github.com/solsteace/kochira/subscription/internal/domain"
+	domainService "github.com/solsteace/kochira/subscription/internal/domain/service"
 	"github.com/solsteace/kochira/subscription/internal/repository"
 )
 
 type SubscriptionService struct {
-	repo repository.Subscription
+	repo             repository.Subscription
+	subscriptionPerk domainService.SubscriptionPerks
 }
 
-func NewSubscriptionService(repo repository.Subscription) SubscriptionService {
-	return SubscriptionService{repo}
+func NewSubscriptionService(
+	repo repository.Subscription,
+	subscriptionPerk domainService.SubscriptionPerks,
+) SubscriptionService {
+	return SubscriptionService{repo, subscriptionPerk}
 }
 
 func (ss SubscriptionService) GetByUserId(id uint64) (domain.Subscription, error) {
 	return ss.repo.GetByOwner(id)
 }
 
-func (ss SubscriptionService) InferPerks(userId uint64) {
+func (ss SubscriptionService) InferPerks(userId uint64) (time.Duration, uint) {
+	subscription, err := ss.repo.GetByOwner(userId)
+	if err != nil {
 
+	}
+	return ss.subscriptionPerk.Infer(subscription)
 }
 
 func (ss SubscriptionService) Init(userId []uint64) error {

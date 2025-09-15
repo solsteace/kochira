@@ -41,13 +41,13 @@ func RunApp() {
 	// Layers
 	// ================================
 	userContext := middleware.NewUserContext("X-User-Id")
-	_ = service.NewSubscriptionPerks(
+	subscriptionPerks := service.NewSubscriptionPerks(
 		service.NewPerks(time.Hour*24*3, 10),
 		service.NewPerks(time.Hour*24*30*12, 500),
 		time.Second*5)
 
 	subscriptionRepo := repository.NewPgSubscription(dbClient)
-	subscriptionService := internal.NewSubscriptionService(subscriptionRepo)
+	subscriptionService := internal.NewSubscriptionService(subscriptionRepo, subscriptionPerks)
 	subscriptionController := internal.NewSubscriptionController(subscriptionService)
 
 	// ================================
