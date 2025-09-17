@@ -68,14 +68,20 @@ func (repo pgUser) GetById(id uint) (domain.User, error) {
 	if err := repo.db.Get(row, query, args...); err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return domain.User{}, oops.NotFound{
+			err2 := oops.NotFound{
 				Err: err,
 				Msg: fmt.Sprintf("user(id:%d) not found", id)}
+			return domain.User{}, fmt.Errorf("repository<pgUser.GetById>: %w", err2)
 		default:
-			return domain.User{}, err
+			return domain.User{}, fmt.Errorf("repository<pgUser.GetById>: %w", err)
 		}
 	}
-	return row.ToUser()
+
+	user, err := row.ToUser()
+	if err != nil {
+		return domain.User{}, fmt.Errorf("repository<pgUser.GetById>: %w", err)
+	}
+	return user, nil
 }
 
 func (repo pgUser) GetByUsername(username string) (domain.User, error) {
@@ -83,16 +89,29 @@ func (repo pgUser) GetByUsername(username string) (domain.User, error) {
 	query := `SELECT * FROM users WHERE username = $1`
 	args := []any{username}
 	if err := repo.db.Get(row, query, args...); err != nil {
-		return domain.User{}, err
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			err2 := oops.NotFound{
+				Err: err,
+				Msg: fmt.Sprintf("user(username:%s) not found", username)}
+			return domain.User{}, fmt.Errorf("repository<pgUser.GetByUsername>: %w", err2)
+		default:
+			return domain.User{}, fmt.Errorf("repository<pgUser.GetByUsername>: %w", err)
+		}
 	}
-	return row.ToUser()
+
+	user, err := row.ToUser()
+	if err != nil {
+		return domain.User{}, fmt.Errorf("repository<pgUser.GetById>: %w", err)
+	}
+	return user, nil
 }
 
 func (repo pgUser) Create(a domain.User) error {
 	ctx := context.Background() // Change later
 	tx, err := repo.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("repository<pgUser.Create>: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -102,11 +121,11 @@ func (repo pgUser) Create(a domain.User) error {
 		VALUES (:username, :password, :email)
 		RETURNING id`)
 	if err != nil {
-		return err
+		return fmt.Errorf("repository<pgUser.Create>: %w", err)
 	}
 	var userId uint64
 	if err := stmt.Get(&userId, row); err != nil {
-		return err
+		return fmt.Errorf("repository<pgUser.Create>: %w", err)
 	}
 
 	query := `
@@ -114,9 +133,13 @@ func (repo pgUser) Create(a domain.User) error {
 		VALUES ($1, $2)`
 	args := []any{userId, false}
 	if _, err := tx.Exec(query, args...); err != nil {
-		return err
+		return fmt.Errorf("repository<pgUser.Create>: %w", err)
 	}
-	return tx.Commit()
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repository<pgUser.Create>: %w", err)
+	}
+	return nil
 }
 
 func (repo pgUser) Update(a domain.User) error {
@@ -129,7 +152,7 @@ func (repo pgUser) Update(a domain.User) error {
 			email = :email
 		WHERE id = :id`
 	if _, err := repo.db.NamedExec(query, row); err != nil {
-		return err
+		return fmt.Errorf("repository<pgUser.Update>: %w", err)
 	}
 	return nil
 }
@@ -143,7 +166,7 @@ func (repo pgUser) GetRegisterOutbox(count uint) ([]outbox.Register, error) {
 		LIMIT $1 `
 	args := []any{count}
 	if err := repo.db.Select(rows, query, args...); err != nil {
-		return []outbox.Register{}, err
+		return []outbox.Register{}, fmt.Errorf("repository<pgUser.GetRegisterOutbox>: %w", err)
 	}
 
 	outbox := []outbox.Register{}
@@ -159,11 +182,11 @@ func (repo pgUser) ResolveRegisterOutbox(id []uint64) error {
 		SET is_done = true
 		WHERE user_id IN (?)`, id)
 	if err != nil {
-		return err
+		return fmt.Errorf("repository<pgUser.ResolveRegisterOutbox>: %w", err)
 	}
 
 	if _, err = repo.db.Exec(repo.db.Rebind(query), args...); err != nil {
-		return err
+		return fmt.Errorf("repository<pgUser.ResolveRegisterOutbox>: %w", err)
 	}
 	return nil
 }

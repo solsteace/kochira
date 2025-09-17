@@ -28,7 +28,7 @@ func (vt valkeyToken) Grant(userId uint, token string) error {
 	key := fmt.Sprintf("user:%d:auth-token", userId)
 	res := adapter.Set(ctx, key, token, vt.tokenLifetime)
 	if res.Err() != nil {
-		return res.Err()
+		return fmt.Errorf("cache<valkeyToken.Grant>: %w", res.Err())
 	}
 	return nil
 }
@@ -40,9 +40,8 @@ func (vt valkeyToken) Revoke(userId uint) error {
 	key := fmt.Sprintf("user:%d:auth-token", userId)
 	res := adapter.Del(ctx, key)
 	if res.Err() != nil {
-		return res.Err()
+		return fmt.Errorf("cache<valkeyToken.Revoke>: %w", res.Err())
 	}
-
 	return nil
 }
 
@@ -53,7 +52,7 @@ func (vt valkeyToken) FindByOwner(userId uint) (string, error) {
 	key := fmt.Sprintf("user:%d:auth-token", userId)
 	res := adapter.Get(ctx, key)
 	if res.Err() != nil {
-		return "", res.Err()
+		return "", fmt.Errorf("cache<valkeyToken.FindByOwner>: %w", res.Err())
 	}
 	return res.String(), nil
 }

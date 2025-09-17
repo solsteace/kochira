@@ -1,7 +1,7 @@
 package account
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -19,12 +19,13 @@ var (
 	envRefreshTokenLifetime int
 )
 
-func LoadEnv() {
+func LoadEnv() error {
 	switch port, err := strconv.ParseInt(os.Getenv("ACCOUNT_PORT"), 10, 32); {
 	case err != nil:
-		log.Fatalf("`ACCOUNT_PORT`: %s", err)
+		return fmt.Errorf("account<LoadEnv>: `ACCOUNT_PORT`: %w", err)
 	case envPort < 0 || envPort > 65535:
-		log.Fatal("`ACCOUNT_PORT: port should be between 0 - 65535 (get: %d)`", port)
+		err := fmt.Errorf("port should be between 0 - 65535 (get: %d)", port)
+		return fmt.Errorf("account<LoadEnv>: `ACCOUNT_PORT`: %w", err)
 	default:
 		envPort = int(port)
 	}
@@ -37,11 +38,14 @@ func LoadEnv() {
 	envTokenSecret = os.Getenv("ACCOUNT_TOKEN_SECRET")
 	switch tokenLifetime, err := strconv.ParseInt(os.Getenv("ACCOUNT_TOKEN_LIFETIME"), 10, 32); {
 	case err != nil:
-		log.Fatalf("`ACCOUNT_TOKEN_LIFETIME`: %s", err)
+		return fmt.Errorf("account<LoadEnv>: `ACCOUNT_TOKEN_LIFETIME`: %w", err)
 	case int(tokenLifetime) < 0:
-		log.Fatal("`ACCOUNT_TOKEN_LIFETIME: converted value cannot be negative (get: %d)`", tokenLifetime)
+		err := fmt.Errorf("`ACCOUNT_TOKEN_LIFETIME: converted value cannot be negative (get: %d)`", tokenLifetime)
+		return fmt.Errorf("account<LoadEnv>: `ACCOUNT_TOKEN_LIFETIME`: %w", err)
 	default:
 		envAccessTokenLifetime = int(tokenLifetime)
 		envRefreshTokenLifetime = envAccessTokenLifetime * 3
 	}
+
+	return nil
 }

@@ -2,6 +2,7 @@ package utility
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	goJwt "github.com/golang-jwt/jwt/v5"
@@ -52,7 +53,7 @@ func (j jwt[PayloadType]) Encode(payload PayloadType) (string, error) {
 	token := goJwt.NewWithClaims(j.method, claims)
 	signedToken, err := token.SignedString(j.secret)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("utility<jwt.Encode>: %w", err)
 	}
 	return signedToken, nil
 }
@@ -69,24 +70,29 @@ func (j jwt[PayloadType]) Decode(token string) (*PayloadType, error) {
 	if err != nil {
 		switch {
 		case errors.Is(err, goJwt.ErrTokenExpired):
-			return nil, oops.Unauthorized{
+			err2 := oops.Unauthorized{
 				Err: err,
 				Msg: "Token has been expired"}
+			return nil, fmt.Errorf("utility<jwt.Decode>: %w", err2)
 		case errors.Is(err, goJwt.ErrTokenUsedBeforeIssued):
-			return nil, oops.Unauthorized{
+			err2 := oops.Unauthorized{
 				Err: err,
 				Msg: "Token is used ahead of its time"}
+			return nil, fmt.Errorf("utility<jwt.Decode>: %w", err2)
 		case errors.Is(err, goJwt.ErrTokenMalformed):
-			return nil, oops.Unauthorized{
+			err2 := oops.Unauthorized{
 				Err: err,
 				Msg: "Token is invalid"}
+			return nil, fmt.Errorf("utility<jwt.Decode>: %w", err2)
 		default:
-			return nil, err
+			return nil, fmt.Errorf("utility<jwt.Decode>: %w", err)
 		}
 	}
 
-	if claims, ok := parsedToken.Claims.(*theClaims[PayloadType]); ok {
-		return &claims.Payload, nil
+	claims, ok := parsedToken.Claims.(*theClaims[PayloadType])
+	if !ok {
+		err := errors.New("Claims type is not `theClaims[PayloadType]`")
+		return nil, fmt.Errorf("utility<jwt.Decode>: %w", err)
 	}
-	return nil, errors.New("Claim somehow could not be parsed from token")
+	return &claims.Payload, nil
 }

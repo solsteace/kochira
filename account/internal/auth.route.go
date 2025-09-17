@@ -34,20 +34,23 @@ func (ac authRoute) login(w http.ResponseWriter, r *http.Request) error {
 
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(reqPayload); err != nil {
-		return err
+		return fmt.Errorf("internal<authRoute.login>: %w", err)
 	}
 	defer r.Body.Close()
 
 	accessToken, refreshToken, err := ac.service.Login(reqPayload.Username, reqPayload.Password)
 	if err != nil {
-		return err
+		return fmt.Errorf("internal<authRoute.login>: %w", err)
 	}
 
 	resPayload := map[string]any{
 		"token": map[string]any{
 			"access":  accessToken,
 			"refresh": refreshToken}}
-	return reqres.HttpOk(w, http.StatusOK, resPayload)
+	if err := reqres.HttpOk(w, http.StatusOK, resPayload); err != nil {
+		return fmt.Errorf("internal<authRoute.login>: %w", err)
+	}
+	return nil
 }
 
 func (ac authRoute) register(w http.ResponseWriter, r *http.Request) error {
@@ -59,7 +62,7 @@ func (ac authRoute) register(w http.ResponseWriter, r *http.Request) error {
 
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(reqPayload); err != nil {
-		return err
+		return fmt.Errorf("internal<authRoute.register>: %w", err)
 	}
 	defer r.Body.Close()
 
@@ -68,11 +71,14 @@ func (ac authRoute) register(w http.ResponseWriter, r *http.Request) error {
 		reqPayload.Password,
 		reqPayload.Email)
 	if err != nil {
-		return err
+		return fmt.Errorf("internal<authRoute.register>: %w", err)
 	}
 
 	resPayload := map[string]any{"msg": "Account successfully created"}
-	return reqres.HttpOk(w, http.StatusCreated, resPayload)
+	if err := reqres.HttpOk(w, http.StatusCreated, resPayload); err != nil {
+		return fmt.Errorf("internal<authRoute.register>: %w", err)
+	}
+	return nil
 }
 
 func (ac authRoute) refresh(w http.ResponseWriter, r *http.Request) error {
@@ -82,51 +88,63 @@ func (ac authRoute) refresh(w http.ResponseWriter, r *http.Request) error {
 
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(reqPayload); err != nil {
-		return err
+		return fmt.Errorf("internal<authRoute.refresh>: %w", err)
 	}
 	defer r.Body.Close()
 
 	accessToken, refreshToken, err := ac.service.Refresh(reqPayload.Token)
 	if err != nil {
-		return err
+		return fmt.Errorf("internal<authRoute.refresh>: %w", err)
 	}
 
 	resPayload := map[string]any{
 		"token": map[string]any{
 			"access":  accessToken,
 			"refresh": refreshToken}}
-	return reqres.HttpOk(w, http.StatusOK, resPayload)
+	if err := reqres.HttpOk(w, http.StatusOK, resPayload); err != nil {
+		return fmt.Errorf("internal<authRoute.refresh>: %w", err)
+	}
+	return nil
 }
 
 func (ac authRoute) logout(w http.ResponseWriter, r *http.Request) error {
 	token := r.Header.Get("Authorization")
 	if token == "" {
-		return oops.Unauthorized{
+		err := oops.Unauthorized{
 			Err: errors.New("Auth token not found"),
 			Msg: "Auth token not found"}
+		return fmt.Errorf("internal<authRoute.logout>: %w", err)
 	}
 
 	if err := ac.service.Logout(token); err != nil {
-		return err
+		return fmt.Errorf("internal<authRoute.logout>: %w", err)
 	}
-	return reqres.HttpOk(w, http.StatusNoContent, nil)
+
+	if err := reqres.HttpOk(w, http.StatusNoContent, nil); err != nil {
+		return fmt.Errorf("internal<authRoute.logout>: %w", err)
+	}
+	return nil
 }
 
 func (ac authRoute) infer(w http.ResponseWriter, r *http.Request) error {
 	token := r.Header.Get("Authorization")
 	if token == "" {
-		return oops.Unauthorized{
+		err := oops.Unauthorized{
 			Err: errors.New("Auth token not found"),
 			Msg: "Auth token not found"}
+		return fmt.Errorf("internal<authRoute.infer>: %w", err)
 	}
 
 	userId, err := ac.service.Infer(token)
 	if err != nil {
-		return err
+		return fmt.Errorf("internal<authRoute.infer>: %w", err)
 	}
 
 	w.Header().Add("X-User-Id", fmt.Sprintf("%d", userId))
-	return reqres.HttpOk(w, http.StatusNoContent, nil)
+	if err := reqres.HttpOk(w, http.StatusNoContent, nil); err != nil {
+		return fmt.Errorf("internal<authRoute.infer>: %w", err)
+	}
+	return nil
 }
 
 func NewAuthRoute(service authService) authRoute {

@@ -35,12 +35,11 @@ func (row authAttemptRow) toHash() map[string]string {
 func (_ authAttemptRow) fromHash(h map[string]string) (authAttemptRow, error) {
 	hOk, err := strconv.ParseBool(h["ok"])
 	if err != nil {
-		fmt.Println(err)
-		return authAttemptRow{}, err
+		return authAttemptRow{}, fmt.Errorf("cache<authAttemptRow.fromHash>: %w", err)
 	}
 	hTime, err := strconv.ParseInt(h["time"], 10, 64)
 	if err != nil {
-		return authAttemptRow{}, err
+		return authAttemptRow{}, fmt.Errorf("cache<authAttemptRow.fromHash>: %w", err)
 	}
 
 	row := authAttemptRow{
@@ -50,6 +49,9 @@ func (_ authAttemptRow) fromHash(h map[string]string) (authAttemptRow, error) {
 }
 
 func (row authAttemptRow) toDomain() (domain.AuthAttempt, error) {
-	aa, _ := domain.NewAuthAttempt(row.Ok, row.Time)
+	aa, err := domain.NewAuthAttempt(row.Ok, row.Time)
+	if err != nil {
+		return domain.AuthAttempt{}, fmt.Errorf("cache<authAttemptRow.toDomain>: %w", err)
+	}
 	return aa, nil
 }

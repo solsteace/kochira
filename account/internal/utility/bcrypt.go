@@ -2,6 +2,7 @@ package utility
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/solsteace/go-lib/oops"
 	bc "golang.org/x/crypto/bcrypt"
@@ -22,11 +23,12 @@ func (b bcrypt) Generate(payload string) ([]byte, error) {
 func (b bcrypt) Compare(digest, payload string) error {
 	switch err := bc.CompareHashAndPassword([]byte(digest), []byte(payload)); {
 	case errors.Is(err, bc.ErrMismatchedHashAndPassword):
-		return oops.Unauthorized{
+		err2 := oops.Unauthorized{
 			Err: err,
 			Msg: "Password doesn't match"}
+		return fmt.Errorf("utility<bcrypt.Compare>: %w", err2)
 	case err != nil:
-		return err
+		return fmt.Errorf("utility<bcrypt.Compare>: %w", err)
 	}
 	return nil
 }

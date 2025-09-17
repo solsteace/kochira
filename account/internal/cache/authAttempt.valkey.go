@@ -44,12 +44,9 @@ func (vaa valkeyAuthAttempt) Add(userId uint, aa domain.AuthAttempt) error {
 	tx.Expire(ctx, zName, vaa.retentionTime)
 	tx.HSet(ctx, hName, hData)
 	tx.Expire(ctx, hName, vaa.retentionTime)
-
-	_, err := tx.Exec(ctx)
-	if err != nil {
-		return err
+	if _, err := tx.Exec(ctx); err != nil {
+		return fmt.Errorf("cache<valkeyAuthAttempt.Add>: %w", err)
 	}
-
 	return nil
 }
 
@@ -60,7 +57,7 @@ func (vaa valkeyAuthAttempt) Get(userId uint) ([]domain.AuthAttempt, error) {
 	zName := fmt.Sprintf("user:%d:auth-attempts", userId)
 	attemptKeys := adapter.ZRevRange(ctx, zName, 0, -1)
 	if attemptKeys.Err() != nil {
-		return []domain.AuthAttempt{}, attemptKeys.Err()
+		return []domain.AuthAttempt{}, fmt.Errorf("cache<valkeyAuthAttempt.Get>: %w", attemptKeys.Err())
 	}
 
 	attempts := []domain.AuthAttempt{}
@@ -72,7 +69,7 @@ func (vaa valkeyAuthAttempt) Get(userId uint) ([]domain.AuthAttempt, error) {
 
 		row, err := authAttemptRow{}.fromHash(res.Val())
 		if err != nil {
-			return []domain.AuthAttempt{}, err
+			return []domain.AuthAttempt{}, fmt.Errorf("cache<valkeyAuthAttempt.Get>: %w", err)
 		}
 		attempt, _ := row.toDomain()
 		attempts = append(attempts, attempt)

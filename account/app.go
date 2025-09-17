@@ -26,6 +26,8 @@ import (
 	"github.com/valkey-io/valkey-go"
 )
 
+const moduleName = "kochira/account"
+
 func RunApp() {
 	// ========================================
 	// Utils
@@ -33,7 +35,8 @@ func RunApp() {
 	// Props to: https://medium.com/@lokeahnming/that-time-i-took-down-my-production-site-with-too-many-database-connections-8758406445e5
 	dbCfg, err := pgx.ParseConfig(envDbUrl)
 	if err != nil {
-		log.Fatalf("Error during connecting to DB: %v", err)
+		err2 := fmt.Errorf("account<RunApp>: DB init: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 	dbClient := sqlx.NewDb(stdlib.OpenDB(*dbCfg), "pgx")
 	dbClient.SetMaxOpenConns(25) // Based on your db's connection limit
@@ -41,14 +44,16 @@ func RunApp() {
 	dbClient.SetConnMaxLifetime(30 * time.Minute) // Replace connections periodically
 	dbClient.SetConnMaxIdleTime(30 * time.Second) // Close connections that aren't being used
 	if err := dbClient.Ping(); err != nil {
-		log.Fatalf("Error during Ping attempt: %v", err)
+		err2 := fmt.Errorf("account<RunApp>: DB ping: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 	defer dbClient.Close()
 
 	cacheClient, err := valkey.NewClient(
 		valkey.MustParseURL(envCacheUrl))
 	if err != nil {
-		log.Fatalf("Error during connecting to cache: %v", err)
+		err2 := fmt.Errorf("account<RunApp>: cache init: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 	defer cacheClient.Close()
 
@@ -132,12 +137,14 @@ func RunApp() {
 
 	<-mqInitReady
 	if err := mq.AddChannel("default"); err != nil {
-		log.Fatalf("Failed to open a channel: %+v", err)
+		err2 := fmt.Errorf("account<RunApp>: channel init: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 
 	err = mq.AddQueue("default", utility.NewDefaultAmqpQueueOpts("hello2"))
 	if err != nil {
-		log.Fatalf("Failed to declare a queue: %+v", err)
+		err2 := fmt.Errorf("account<RunApp>: queue init: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 
 	go func() {
@@ -179,6 +186,6 @@ func RunApp() {
 	// ========================================
 	// Init
 	// ========================================
-	fmt.Printf("Server's running at :%d\n", envPort)
+	fmt.Printf("%s: Server's running at :%d\n", moduleName, envPort)
 	http.ListenAndServe(fmt.Sprintf(":%d", envPort), app)
 }
