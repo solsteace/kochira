@@ -1,7 +1,7 @@
 package subscription
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -13,16 +13,18 @@ var (
 	envMqUrl string
 )
 
-func LoadEnv() {
+func LoadEnv() error {
 	switch port, err := strconv.ParseInt(os.Getenv("SUBSCRIPTION_PORT"), 10, 64); {
 	case err != nil:
-		log.Fatalf("`LINK_PORT`: %s", err)
+		return fmt.Errorf("subscription<LoadEnv>: `SUBSCRIPTION_PORT`: %w", err)
 	case port < 0 || port > 65535:
-		log.Fatal("`LINK_PORT: port should be between 0 - 65535 (get: %d)`", port)
+		err := fmt.Errorf("port should be between 0 - 65535 (get: %d)", port)
+		return fmt.Errorf("subscription<LoadEnv>: `SUBSCRIPTION_PORT`: %w", err)
 	default:
 		envPort = int(port)
 	}
 
 	envDbUrl = os.Getenv("SUBSCRIPTION_DB_URL")
 	envMqUrl = os.Getenv("SUBSCRIPTION_MQ_URL")
+	return nil
 }

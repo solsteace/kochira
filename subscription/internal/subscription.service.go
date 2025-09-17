@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"slices"
 	"time"
 
@@ -22,13 +23,18 @@ func NewSubscriptionService(
 }
 
 func (ss SubscriptionService) GetByUserId(id uint64) (domain.Subscription, error) {
-	return ss.repo.GetByOwner(id)
+	subscription, err := ss.repo.GetByOwner(id)
+	if err != nil {
+		return domain.Subscription{}, fmt.Errorf(
+			"internal<SubscriptionService.GetByUserId>: %w", err)
+	}
+	return subscription, nil
 }
 
 func (ss SubscriptionService) InferPerks(userId uint64) (time.Duration, uint) {
 	subscription, err := ss.repo.GetByOwner(userId)
 	if err != nil {
-
+		return 0, 0
 	}
 	return ss.subscriptionPerk.Infer(subscription)
 }
@@ -36,7 +42,7 @@ func (ss SubscriptionService) InferPerks(userId uint64) (time.Duration, uint) {
 func (ss SubscriptionService) Init(userId []uint64) error {
 	existingSubscriptions, err := ss.repo.CheckManyByOwner(userId)
 	if err != nil {
-		return err
+		return fmt.Errorf("internal<SubscriptionService.Init>: %w", err)
 	}
 
 	now := time.Now()
@@ -50,12 +56,15 @@ func (ss SubscriptionService) Init(userId []uint64) error {
 
 		s, err := domain.NewSubscription(nil, uId, now)
 		if err != nil {
-			return err
+			return fmt.Errorf("internal<SubscriptionService.Init>: %w", err)
 		}
 		subscriptions = append(subscriptions, s)
 	}
 
-	return ss.repo.Create(subscriptions)
+	if err := ss.repo.Create(subscriptions); err != nil {
+		return fmt.Errorf("internal<SubscriptionService.Init>: %w", err)
+	}
+	return nil
 }
 
 func (ss SubscriptionService) Order(

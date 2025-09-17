@@ -22,11 +22,14 @@ import (
 	"github.com/solsteace/kochira/subscription/internal/utility"
 )
 
+const moduleName = "kochira/subscription"
+
 func RunApp() {
 	upSince := time.Now().Unix()
 	dbCfg, err := pgx.ParseConfig(envDbUrl)
 	if err != nil {
-		log.Fatalf("Error during connecting to DB: %v", err)
+		err2 := fmt.Errorf("subscription<RunApp>: DB init: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 	dbClient := sqlx.NewDb(stdlib.OpenDB(*dbCfg), "pgx")
 	dbClient.SetMaxOpenConns(25) // Based on your db's connection limit
@@ -34,7 +37,8 @@ func RunApp() {
 	dbClient.SetConnMaxLifetime(30 * time.Minute) // Replace connections periodically
 	dbClient.SetConnMaxIdleTime(30 * time.Second) // Close connections that aren't being used
 	if err := dbClient.Ping(); err != nil {
-		log.Fatalf("Error during Ping attempt: %v", err)
+		err2 := fmt.Errorf("subscription<RunApp>: DB ping: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 	defer dbClient.Close()
 
@@ -93,12 +97,14 @@ func RunApp() {
 
 	<-mqInitReady
 	if err := mq.AddChannel("default"); err != nil {
-		log.Fatalf("Failed to open a channel: %+v", err)
+		err2 := fmt.Errorf("subscription<RunApp>: channel init: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 
 	err = mq.AddQueue("default", utility.NewDefaultAmqpQueueOpts("hello2"))
 	if err != nil {
-		log.Fatalf("Failed to declare a queue: %+v", err)
+		err2 := fmt.Errorf("subscription<RunApp>: queue init: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 
 	err = mq.AddConsumer(
@@ -116,12 +122,13 @@ func RunApp() {
 		},
 		utility.NewDefaultAmqpConsumeOpts("hello2", false))
 	if err != nil {
-		log.Fatalf("Failed to start consuming: %+v", err)
+		err2 := fmt.Errorf("subscription<RunApp>: consumer init: %w", err)
+		log.Fatalf("%s: %v", moduleName, err2)
 	}
 
 	// ========================================
 	// Init
 	// ========================================
-	fmt.Printf("Server's running at :%d\n", envPort)
+	fmt.Printf("%s: Server's running at :%d\n", moduleName, envPort)
 	http.ListenAndServe(fmt.Sprintf(":%d", envPort), app)
 }

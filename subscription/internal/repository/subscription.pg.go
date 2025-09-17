@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -41,12 +42,14 @@ func (repo pgSubscription) CheckManyByOwner(id []uint64) ([]uint64, error) {
 		FROM subscriptions
 		WHERE user_id IN (?)`, id)
 	if err != nil {
-		return []uint64{}, err
+		return []uint64{}, fmt.Errorf(
+			"repository<pgSubscription.CheckManyByOwner>: %w", err)
 	}
 
 	foundId := new([]uint64)
 	if err := repo.db.Select(foundId, repo.db.Rebind(query), args...); err != nil {
-		return []uint64{}, err
+		return []uint64{}, fmt.Errorf(
+			"repository<pgSubscription.CheckManyByOwner>: %w", err)
 	}
 
 	return *foundId, nil
@@ -60,7 +63,8 @@ func (repo pgSubscription) GetByOwner(id uint64) (domain.Subscription, error) {
 		WHERE user_id = $1`
 	args := []any{id}
 	if err := repo.db.Get(row, query, args...); err != nil {
-		return domain.Subscription{}, err
+		return domain.Subscription{}, fmt.Errorf(
+			"repository<pgSubscription.GetByOwner>: %w", err)
 	}
 
 	return row.ToDomain()
@@ -76,7 +80,7 @@ func (repo pgSubscription) Create(subscriptions []domain.Subscription) error {
 		INSERT INTO subscriptions(user_id, expired_at)
 		VALUES (:user_id, :expired_at)`
 	if _, err := repo.db.NamedExec(query, rows); err != nil {
-		return err
+		return fmt.Errorf("repository<pgSubscription.Create>: %w", err)
 	}
 	return nil
 }

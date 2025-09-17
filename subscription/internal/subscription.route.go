@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -26,7 +27,7 @@ func (sr subscriptionRoute) findSelf(w http.ResponseWriter, r *http.Request) err
 	userId, _ := r.Context().Value(middleware.UserContextCtxKey).(middleware.UserContextCtxPayload)
 	result, err := sr.service.GetByUserId(uint64(userId))
 	if err != nil {
-		return err
+		return fmt.Errorf("internal<subscriptionRoute.Use>: %w", err)
 	}
 
 	return reqres.HttpOk(w, http.StatusOK, map[string]any{
