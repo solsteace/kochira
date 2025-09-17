@@ -22,3 +22,21 @@ func HttpStatusCode(err error) int {
 		return http.StatusInternalServerError
 	}
 }
+
+func HttpErrorMsg(err error) string {
+	var lastErr error
+	for err != nil {
+		lastErr = err
+		err = errors.Unwrap(err)
+	}
+
+	switch {
+	case errors.As(lastErr, &oops.BadRequest{}),
+		errors.As(lastErr, &oops.BadValues{}),
+		errors.As(lastErr, &oops.Unauthorized{}),
+		errors.As(lastErr, &oops.Forbidden{}),
+		errors.As(lastErr, &oops.NotFound{}):
+		return lastErr.Error()
+	}
+	return "internal server error"
+}
