@@ -59,6 +59,7 @@ func RunApp() {
 	// Routes
 	// ================================
 	app := chi.NewRouter()
+	app.Use(chiMiddleware.RequestID)
 	app.Use(chiMiddleware.Logger)
 	app.Use(chiMiddleware.Recoverer)
 
