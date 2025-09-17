@@ -6,14 +6,24 @@ Worry not, Kochira will ***show you the way*** to share links!
 ## Feature Roadmap
 
 - [x] URL Shortener
-- [ ] Redirection Analysis
-- [ ] <strike>Pro Plans</strike> 😁
+- [ ] Premium perk subscription (simulation! 😁)
 
 ## Developing 
-This repository uses monorepo approach by relying on `go.work`. It contains list of directories that are
-currently *being worked on* in this project. It helps editors locate function definitions, modules, and more. 
-If you want to focus developing certain service, you could just make the list only contains `lib` and the 
-service path. 
+This repository uses monorepo approach by relying on `go.work`. If you want to focus developing 
+certain service, just imagine your scenario like this:
+
+> What a good day to develop `subscription` and `account` service today...
+
+Since we want to _work_ on these modules, our `go.work` file would be:
+```
+go <your_go_version>
+
+use (
+  ./lib
+  ./subscription
+  ./account
+)
+``` 
 
 ## Deploying
 You could deploy this project in:
