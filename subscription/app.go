@@ -19,6 +19,7 @@ import (
 	"github.com/solsteace/kochira/subscription/internal/domain/service"
 	"github.com/solsteace/kochira/subscription/internal/middleware"
 	"github.com/solsteace/kochira/subscription/internal/repository"
+	"github.com/solsteace/kochira/subscription/internal/utility"
 )
 
 func RunApp() {
@@ -84,54 +85,39 @@ func RunApp() {
 	// ========================================
 	// Side effects & subscriptions
 	// ========================================
-	mqClient, err := amqp091.Dial(envMqUrl)
-	if err != nil {
-		log.Fatalf("Failed to connect to mq:%+v", err)
+	mq := utility.NewAmqp()
+	mqMonitorEnd := make(chan struct{})
+	mqInitReady := make(chan struct{})
+	go mq.Start(envMqUrl, mqInitReady)
+	go mq.Monitor(mqMonitorEnd)
+
+	<-mqInitReady
+	if err := mq.AddChannel("default"); err != nil {
+		log.Fatalf("Failed to open a channel: %+v", err)
 	}
 
-	ch, err := mqClient.Channel()
+	err = mq.AddQueue("default", utility.NewDefaultAmqpQueueOpts("hello2"))
 	if err != nil {
-		log.Fatalf("Failed to open a channel:%+v", err)
-	}
-	queue, err := ch.QueueDeclare(
-		"hello", // name: what should we name the queue we're going to use?
-		false,   // durable: [read function doc]
-		false,   // delete [read function doc]
-		false,   // exclusive: can this queue be accessed using other connection (channel, I guess)?
-		false,   // no-wait: should we assume this queue had already been declared on the broker?
-		nil,     // arguments
-	)
-	if err != nil {
-		log.Fatalf("Failed to declare a queue:%+v", queue)
+		log.Fatalf("Failed to declare a queue: %+v", err)
 	}
 
-	msgs, err := ch.Consume(
-		queue.Name, // queue: which queue we're receiving messages from?
-		"",         // consumer: what name should I identify myself with?
-		false,      // auto-ack: upon receiving message, should it be ACK-ed automatically?
-		false,      // exclusive
-		false,      // no-local
-		false,      // no-wait
-		nil,        // args
-	)
-	go func() {
-		for msg := range msgs {
+	err = mq.AddConsumer(
+		"default",
+		func(msg amqp091.Delivery) error {
 			payload, err := messaging.DeCreateSubscription(msg.Body)
 			if err != nil {
-				log.Printf("Failed to deserialize message: %v\n", err)
-				continue
+				return fmt.Errorf("<consume callback>: %w", err)
 			}
 
 			if err := subscriptionService.Init(payload.Data.Users); err != nil {
-				log.Printf("Failed to init users: %v\n", err)
-				continue
+				return fmt.Errorf("<consume callback>: %w", err)
 			}
-
-			if err := msg.Ack(false); err != nil {
-				log.Printf("Failed to ACK message: %v\n", err)
-			}
-		}
-	}()
+			return nil
+		},
+		utility.NewDefaultAmqpConsumeOpts("hello2", false))
+	if err != nil {
+		log.Fatalf("Failed to start consuming: %+v", err)
+	}
 
 	// ========================================
 	// Init

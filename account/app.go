@@ -1,7 +1,6 @@
 package account
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/rabbitmq/amqp091-go"
 	"github.com/solsteace/go-lib/reqres"
 	"github.com/solsteace/go-lib/temporary/messaging"
 	"github.com/solsteace/go-lib/token"
@@ -126,27 +124,30 @@ func RunApp() {
 	// ========================================
 	// Side effects, susbcriptions
 	// ========================================
-	mqClient, err := amqp091.Dial(envMqUrl)
-	if err != nil {
-		log.Fatalf("Failed to connect to mq:%+v", err)
+	mq := utility.NewAmqp()
+	mqMonitorEnd := make(chan struct{})
+	mqInitReady := make(chan struct{})
+	go mq.Start(envMqUrl, mqInitReady)
+	go mq.Monitor(mqMonitorEnd)
+
+	<-mqInitReady
+	if err := mq.AddChannel("default"); err != nil {
+		log.Fatalf("Failed to open a channel: %+v", err)
 	}
-	ch, err := mqClient.Channel()
+
+	err = mq.AddQueue("default", utility.NewDefaultAmqpQueueOpts("hello2"))
 	if err != nil {
-		log.Fatalf("Failed to open a channel:%+v", err)
-	}
-	queue, err := ch.QueueDeclare(
-		"hello", // name: what's the name of the queue we're going to use?
-		false,   // durable: [read function doc]
-		false,   // delete [read function doc]
-		false,   // exclusive: can this queue be accessed using other connection (channel, I guess)?
-		false,   // no-wait: should we assume this queue had already been declared on the broker?
-		nil,     // arguments
-	)
-	if err != nil {
-		log.Fatalf("Failed to declare a queue:%+v", queue)
+		log.Fatalf("Failed to declare a queue: %+v", err)
 	}
 
 	go func() {
+		sendFx := func(body []byte) error {
+			return mq.Publish(
+				"default",
+				body,
+				utility.NewDefaultAmqpPublishOpts("", "hello2", "application/json"))
+		}
+
 		handle := func(outboxes []outbox.Register) ([]uint64, error) {
 			userId := []uint64{}
 			for _, o := range outboxes {
@@ -158,17 +159,7 @@ func RunApp() {
 				return []uint64{}, err
 			}
 
-			ctx := context.Background() // Use the default one, for now
-			err = ch.PublishWithContext(
-				ctx,
-				"",
-				queue.Name,
-				false,
-				false,
-				amqp091.Publishing{
-					ContentType: "application/json",
-					Body:        body})
-			if err != nil {
+			if err := sendFx(body); err != nil {
 				return []uint64{}, err
 			}
 			return userId, nil
