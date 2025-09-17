@@ -99,6 +99,7 @@ func RunApp() {
 	// Routings
 	// ========================================
 	app := chi.NewRouter()
+	app.Use(middleware.RequestID)
 	app.Use(middleware.Logger)
 	app.Use(middleware.Recoverer)
 
