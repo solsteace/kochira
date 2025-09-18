@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/solsteace/go-lib/reqres"
 	"github.com/solsteace/kochira/subscription/internal/controller"
 	"github.com/solsteace/kochira/subscription/internal/middleware"
 	"github.com/solsteace/kochira/subscription/internal/repository"
@@ -62,16 +61,14 @@ func RunApp() {
 	// Routes
 	// ================================
 	app := chi.NewRouter()
+	v1 := chi.NewRouter()
 	app.Use(chiMiddleware.RequestID)
 	app.Use(chiMiddleware.Logger)
 	app.Use(chiMiddleware.Recoverer)
 
-	v1 := chi.NewRouter()
 	statusRoute.Use(v1)
-
 	app.Mount("/api/v1", v1)
-	app.Get("/health", reqres.HttpHandlerWithError(apiRoute.Health))
-	app.NotFound(reqres.HttpHandlerWithError(apiRoute.NotFound))
+	apiRoute.Use(app)
 
 	// ========================================
 	// Side effects & subscriptions
