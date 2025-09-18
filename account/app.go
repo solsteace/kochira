@@ -13,11 +13,9 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/solsteace/go-lib/temporary/messaging"
 	"github.com/solsteace/go-lib/token"
 	"github.com/solsteace/kochira/account/internal/cache"
 	"github.com/solsteace/kochira/account/internal/controller"
-	"github.com/solsteace/kochira/account/internal/domain/outbox"
 	domainService "github.com/solsteace/kochira/account/internal/domain/service"
 	"github.com/solsteace/kochira/account/internal/repository"
 	"github.com/solsteace/kochira/account/internal/route"
@@ -132,37 +130,15 @@ func RunApp() {
 	}
 
 	go func() {
-		sendFx := func(body []byte) error {
-			return mq.Publish(
-				"default",
-				body,
-				utility.NewDefaultAmqpPublishOpts("", "hello2", "application/json"))
-		}
-
-		handle := func(outboxes []outbox.Register) ([]uint64, error) {
-			userId := []uint64{}
-			for _, o := range outboxes {
-				userId = append(userId, o.UserId())
-			}
-
-			body, err := messaging.SerCreateSubscription(userId)
-			if err != nil {
-				return []uint64{}, err
-			}
-
-			if err := sendFx(body); err != nil {
-				return []uint64{}, err
-			}
-			return userId, nil
+		opts := utility.NewDefaultAmqpPublishOpts("", "hello2", "application/json")
+		send := func(body []byte) error {
+			return mq.Publish("default", body, opts)
 		}
 
 		t := time.NewTicker(time.Second * 2)
-		for {
-			select {
-			case <-t.C:
-				if err := authService.HandleNewUsers(20, handle); err != nil {
-					fmt.Println(err)
-				}
+		for range t.C {
+			if err := controller.PublishNewUser(20, send); err != nil {
+				log.Printf("%s: %v\n", moduleName, err)
 			}
 		}
 	}()

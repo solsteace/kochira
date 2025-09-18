@@ -10,7 +10,6 @@ import (
 	"github.com/solsteace/go-lib/token"
 	"github.com/solsteace/kochira/account/internal/cache"
 	"github.com/solsteace/kochira/account/internal/domain"
-	"github.com/solsteace/kochira/account/internal/domain/outbox"
 	domainService "github.com/solsteace/kochira/account/internal/domain/service"
 	"github.com/solsteace/kochira/account/internal/repository"
 )
@@ -166,22 +165,30 @@ func (as Auth) Infer(token string) (uint64, error) {
 
 func (as Auth) HandleNewUsers(
 	maxCount uint,
-	handleFx func(o []outbox.Register) ([]uint64, error),
+	payloader func(users []uint64) ([]byte, error),
+	send func([]byte) error,
 ) error {
 	outbox, err := as.userRepo.GetRegisterOutbox(maxCount)
-	if err != nil {
+	switch {
+	case err != nil:
 		return fmt.Errorf("service<Auth.HandleNewUsers>: %w", err)
-	}
-	if len(outbox) == 0 {
+	case len(outbox) == 0:
 		return nil
 	}
 
-	sentOutbox, err := handleFx(outbox)
+	handledUser := []uint64{}
+	for _, o := range outbox {
+		handledUser = append(handledUser, o.UserId())
+	}
+	payload, err := payloader(handledUser)
 	if err != nil {
 		return fmt.Errorf("service<Auth.HandleNewUsers>: %w", err)
 	}
+	if err := send(payload); err != nil {
+		return fmt.Errorf("service<Auth.HandleNewUsers>: %w", err)
+	}
 
-	if err := as.userRepo.ResolveRegisterOutbox(sentOutbox); err != nil {
+	if err := as.userRepo.ResolveRegisterOutbox(handledUser); err != nil {
 		return fmt.Errorf("service<Auth.HandleNewUsers>: %w", err)
 	}
 	return nil

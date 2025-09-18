@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/solsteace/go-lib/oops"
 	"github.com/solsteace/go-lib/reqres"
+	"github.com/solsteace/go-lib/temporary/messaging"
 	"github.com/solsteace/kochira/account/internal/service"
 )
 
@@ -138,6 +139,14 @@ func (a Auth) Infer(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Add("X-User-Id", fmt.Sprintf("%d", userId))
 	if err := reqres.HttpOk(w, http.StatusNoContent, nil); err != nil {
 		return fmt.Errorf("[%s] controller<Auth.Infer>: %w", reqId, err)
+	}
+	return nil
+}
+
+func (a Auth) PublishNewUser(maxUser uint, sender func(body []byte) error) error {
+	makePayload := messaging.SerCreateSubscription
+	if err := a.service.HandleNewUsers(maxUser, makePayload, sender); err != nil {
+		return fmt.Errorf("[%s] controller<Auth.PublishNewUser>: %w", err)
 	}
 	return nil
 }
