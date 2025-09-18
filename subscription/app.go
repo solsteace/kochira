@@ -7,19 +7,20 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/rabbitmq/amqp091-go"
 	"github.com/solsteace/go-lib/reqres"
-	"github.com/solsteace/go-lib/temporary/messaging"
-	"github.com/solsteace/kochira/subscription/internal"
-	"github.com/solsteace/kochira/subscription/internal/domain/service"
+	"github.com/solsteace/kochira/subscription/internal/controller"
 	"github.com/solsteace/kochira/subscription/internal/middleware"
 	"github.com/solsteace/kochira/subscription/internal/repository"
+	"github.com/solsteace/kochira/subscription/internal/route"
+	"github.com/solsteace/kochira/subscription/internal/service"
 	"github.com/solsteace/kochira/subscription/internal/utility"
+
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	domainService "github.com/solsteace/kochira/subscription/internal/domain/service"
 )
 
 const moduleName = "kochira/subscription"
@@ -46,14 +47,16 @@ func RunApp() {
 	// Layers
 	// ================================
 	userContext := middleware.NewUserContext("X-User-Id")
-	subscriptionPerks := service.NewSubscriptionPerks(
-		service.NewPerks(time.Hour*24*3, 10),
-		service.NewPerks(time.Hour*24*30*12, 500),
+	subscriptionPerks := domainService.NewSubscriptionPerks(
+		domainService.NewPerks(time.Hour*24*3, 10),
+		domainService.NewPerks(time.Hour*24*30*12, 500),
 		time.Second*5)
 
 	subscriptionRepo := repository.NewPgSubscription(dbClient)
-	subscriptionService := internal.NewSubscriptionService(subscriptionRepo, subscriptionPerks)
-	subscriptionRoute := internal.NewSubscriptionRoute(subscriptionService, userContext)
+	subscriptionService := service.NewSubscription(subscriptionRepo, subscriptionPerks)
+	subscriptionController := controller.NewSubscription(subscriptionService)
+	subscriptionRoute := route.NewSubscription(subscriptionController, userContext)
+	ApiRoute := route.NewApi(upSince)
 
 	// ================================
 	// Routes
@@ -67,25 +70,8 @@ func RunApp() {
 	subscriptionRoute.Use(v1)
 
 	app.Mount("/api/v1", v1)
-	app.Get("/health", reqres.HttpHandlerWithError(
-		func(w http.ResponseWriter, r *http.Request) error {
-			return reqres.HttpOk(
-				w,
-				http.StatusOK,
-				map[string]any{
-					"msg": "Server is healthy",
-					"data": map[string]any{
-						"uptime": time.Now().Unix() - upSince,
-					}})
-		}))
-	app.NotFound(reqres.HttpHandlerWithError(
-		func(w http.ResponseWriter, r *http.Request) error {
-			return reqres.HttpOk(
-				w,
-				http.StatusNotFound,
-				map[string]any{
-					"msg": "The endpoint you're reaching wasn't found"})
-		}))
+	app.Get("/health", reqres.HttpHandlerWithError(ApiRoute.Health))
+	app.NotFound(reqres.HttpHandlerWithError(ApiRoute.NotFound))
 
 	// ========================================
 	// Side effects & subscriptions
@@ -101,26 +87,13 @@ func RunApp() {
 		err2 := fmt.Errorf("subscription<RunApp>: channel init: %w", err)
 		log.Fatalf("%s: %v", moduleName, err2)
 	}
-
-	err = mq.AddQueue("default", utility.NewDefaultAmqpQueueOpts("hello2"))
-	if err != nil {
+	if err := mq.AddQueue("default", utility.NewDefaultAmqpQueueOpts("hello2")); err != nil {
 		err2 := fmt.Errorf("subscription<RunApp>: queue init: %w", err)
 		log.Fatalf("%s: %v", moduleName, err2)
 	}
-
 	err = mq.AddConsumer(
 		"default",
-		func(msg amqp091.Delivery) error {
-			payload, err := messaging.DeCreateSubscription(msg.Body)
-			if err != nil {
-				return fmt.Errorf("<consume callback>: %w", err)
-			}
-
-			if err := subscriptionService.Init(payload.Data.Users); err != nil {
-				return fmt.Errorf("<consume callback>: %w", err)
-			}
-			return nil
-		},
+		subscriptionController.InitSubscription,
 		utility.NewDefaultAmqpConsumeOpts("hello2", false))
 	if err != nil {
 		err2 := fmt.Errorf("subscription<RunApp>: consumer init: %w", err)

@@ -1,4 +1,4 @@
-package internal
+package service
 
 import (
 	"fmt"
@@ -10,19 +10,19 @@ import (
 	"github.com/solsteace/kochira/subscription/internal/repository"
 )
 
-type SubscriptionService struct {
+type Subscription struct {
 	repo             repository.Subscription
 	subscriptionPerk domainService.SubscriptionPerks
 }
 
-func NewSubscriptionService(
+func NewSubscription(
 	repo repository.Subscription,
 	subscriptionPerk domainService.SubscriptionPerks,
-) SubscriptionService {
-	return SubscriptionService{repo, subscriptionPerk}
+) Subscription {
+	return Subscription{repo, subscriptionPerk}
 }
 
-func (ss SubscriptionService) GetByUserId(id uint64) (domain.Subscription, error) {
+func (ss Subscription) GetByUserId(id uint64) (domain.Subscription, error) {
 	subscription, err := ss.repo.GetByOwner(id)
 	if err != nil {
 		return domain.Subscription{}, fmt.Errorf(
@@ -31,7 +31,7 @@ func (ss SubscriptionService) GetByUserId(id uint64) (domain.Subscription, error
 	return subscription, nil
 }
 
-func (ss SubscriptionService) InferPerks(userId uint64) (time.Duration, uint) {
+func (ss Subscription) InferPerks(userId uint64) (time.Duration, uint) {
 	subscription, err := ss.repo.GetByOwner(userId)
 	if err != nil {
 		return 0, 0
@@ -39,7 +39,7 @@ func (ss SubscriptionService) InferPerks(userId uint64) (time.Duration, uint) {
 	return ss.subscriptionPerk.Infer(subscription)
 }
 
-func (ss SubscriptionService) Init(userId []uint64) error {
+func (ss Subscription) Init(userId []uint64) error {
 	existingSubscriptions, err := ss.repo.CheckManyByOwner(userId)
 	if err != nil {
 		return fmt.Errorf("internal<SubscriptionService.Init>: %w", err)
@@ -67,7 +67,7 @@ func (ss SubscriptionService) Init(userId []uint64) error {
 	return nil
 }
 
-func (ss SubscriptionService) Order(
+func (ss Subscription) Order(
 	userId uint64,
 	packageName string,
 	quantity uint,
@@ -75,5 +75,5 @@ func (ss SubscriptionService) Order(
 
 }
 
-func (ss SubscriptionService) Extend(userId uint64, packageName string) {
+func (ss Subscription) Extend(userId uint64, packageName string) {
 }
