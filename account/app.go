@@ -13,15 +13,15 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/solsteace/go-lib/reqres"
 	"github.com/solsteace/go-lib/temporary/messaging"
 	"github.com/solsteace/go-lib/token"
-	"github.com/solsteace/kochira/account/internal"
-	account "github.com/solsteace/kochira/account/internal"
 	"github.com/solsteace/kochira/account/internal/cache"
+	"github.com/solsteace/kochira/account/internal/controller"
 	"github.com/solsteace/kochira/account/internal/domain/outbox"
 	domainService "github.com/solsteace/kochira/account/internal/domain/service"
 	"github.com/solsteace/kochira/account/internal/repository"
+	"github.com/solsteace/kochira/account/internal/route"
+	"github.com/solsteace/kochira/account/internal/service"
 	"github.com/solsteace/kochira/account/internal/utility"
 	"github.com/valkey-io/valkey-go"
 )
@@ -85,7 +85,7 @@ func RunApp() {
 		cacheClient,
 		time.Duration(envRefreshTokenLifetime)*time.Second)
 
-	authService := account.NewAuthService(
+	authService := service.NewAuth(
 		accountRepo,
 		authAttemptCache,
 		tokenCache,
@@ -93,39 +93,22 @@ func RunApp() {
 		accessTokenHandler,
 		refreshTokenHandler,
 		authAttemptDomainService)
-	authRoute := internal.NewAuthRoute(authService)
+	controller := controller.NewAuth(authService)
+	authRoute := route.NewAuth(controller)
+	apiRoute := route.NewApi(upSince)
 
 	// ========================================
 	// Routings
 	// ========================================
 	app := chi.NewRouter()
+	v1 := chi.NewRouter()
 	app.Use(middleware.RequestID)
 	app.Use(middleware.Logger)
 	app.Use(middleware.Recoverer)
 
-	v1 := chi.NewRouter()
 	authRoute.Use(v1)
-
 	app.Mount("/api/v1", v1)
-	app.Get("/health", reqres.HttpHandlerWithError(
-		func(w http.ResponseWriter, r *http.Request) error {
-			return reqres.HttpOk(
-				w,
-				http.StatusOK,
-				map[string]any{
-					"msg": "Server is healthy",
-					"data": map[string]any{
-						"uptime": time.Now().Unix() - upSince,
-					}})
-		}))
-	app.NotFound(reqres.HttpHandlerWithError(
-		func(w http.ResponseWriter, r *http.Request) error {
-			return reqres.HttpOk(
-				w,
-				http.StatusNotFound,
-				map[string]any{
-					"msg": "The endpoint you're reaching wasn't found"})
-		}))
+	apiRoute.Use(app)
 
 	// ========================================
 	// Side effects, susbcriptions

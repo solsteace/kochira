@@ -1,4 +1,4 @@
-package internal
+package controller
 
 import (
 	"encoding/json"
@@ -6,28 +6,17 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/solsteace/go-lib/oops"
 	"github.com/solsteace/go-lib/reqres"
+	"github.com/solsteace/kochira/account/internal/service"
 )
 
-type authRoute struct {
-	service authService
+type Auth struct {
+	service service.Auth
 }
 
-func (ar authRoute) Use(parent *chi.Mux) {
-	auth := chi.NewRouter()
-	auth.Get("/infer", reqres.HttpHandlerWithError(ar.infer))
-	auth.Post("/register", reqres.HttpHandlerWithError(ar.register))
-	auth.Post("/login", reqres.HttpHandlerWithError(ar.login))
-	auth.Post("/refresh", reqres.HttpHandlerWithError(ar.refresh))
-	auth.Post("/logout", reqres.HttpHandlerWithError(ar.logout))
-
-	parent.Mount("/auth", auth)
-}
-
-func (ac authRoute) login(w http.ResponseWriter, r *http.Request) error {
+func (s Auth) Login(w http.ResponseWriter, r *http.Request) error {
 	reqId := middleware.GetReqID(r.Context())
 	reqPayload := new(struct {
 		Username string `json:"username"`
@@ -36,13 +25,13 @@ func (ac authRoute) login(w http.ResponseWriter, r *http.Request) error {
 
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(reqPayload); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.login>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Login>: %w", reqId, err)
 	}
 	defer r.Body.Close()
 
-	accessToken, refreshToken, err := ac.service.Login(reqPayload.Username, reqPayload.Password)
+	accessToken, refreshToken, err := s.service.Login(reqPayload.Username, reqPayload.Password)
 	if err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.login>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Login>: %w", reqId, err)
 	}
 
 	resPayload := map[string]any{
@@ -50,12 +39,12 @@ func (ac authRoute) login(w http.ResponseWriter, r *http.Request) error {
 			"access":  accessToken,
 			"refresh": refreshToken}}
 	if err := reqres.HttpOk(w, http.StatusOK, resPayload); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.login>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Login>: %w", reqId, err)
 	}
 	return nil
 }
 
-func (ac authRoute) register(w http.ResponseWriter, r *http.Request) error {
+func (s Auth) Register(w http.ResponseWriter, r *http.Request) error {
 	reqId := middleware.GetReqID(r.Context())
 	reqPayload := new(struct {
 		Username string `json:"username"`
@@ -65,26 +54,26 @@ func (ac authRoute) register(w http.ResponseWriter, r *http.Request) error {
 
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(reqPayload); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.register>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Register>: %w", reqId, err)
 	}
 	defer r.Body.Close()
 
-	err := ac.service.Register(
+	err := s.service.Register(
 		reqPayload.Username,
 		reqPayload.Password,
 		reqPayload.Email)
 	if err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.register>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Register>: %w", reqId, err)
 	}
 
 	resPayload := map[string]any{"msg": "Account successfully created"}
 	if err := reqres.HttpOk(w, http.StatusCreated, resPayload); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.register>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Register>: %w", reqId, err)
 	}
 	return nil
 }
 
-func (ac authRoute) refresh(w http.ResponseWriter, r *http.Request) error {
+func (s Auth) Refresh(w http.ResponseWriter, r *http.Request) error {
 	reqId := middleware.GetReqID(r.Context())
 	reqPayload := new(struct {
 		Token string `json:"token"`
@@ -92,13 +81,13 @@ func (ac authRoute) refresh(w http.ResponseWriter, r *http.Request) error {
 
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(reqPayload); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.refresh>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Refresh>: %w", reqId, err)
 	}
 	defer r.Body.Close()
 
-	accessToken, refreshToken, err := ac.service.Refresh(reqPayload.Token)
+	accessToken, refreshToken, err := s.service.Refresh(reqPayload.Token)
 	if err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.refresh>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Refresh>: %w", reqId, err)
 	}
 
 	resPayload := map[string]any{
@@ -106,53 +95,53 @@ func (ac authRoute) refresh(w http.ResponseWriter, r *http.Request) error {
 			"access":  accessToken,
 			"refresh": refreshToken}}
 	if err := reqres.HttpOk(w, http.StatusOK, resPayload); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.refresh>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Refresh>: %w", reqId, err)
 	}
 	return nil
 }
 
-func (ac authRoute) logout(w http.ResponseWriter, r *http.Request) error {
+func (a Auth) Logout(w http.ResponseWriter, r *http.Request) error {
 	reqId := middleware.GetReqID(r.Context())
 	token := r.Header.Get("Authorization")
 	if token == "" {
 		err := oops.Unauthorized{
 			Err: errors.New("Auth token not found"),
 			Msg: "Auth token not found"}
-		return fmt.Errorf("[%s] internal<authRoute.logout>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Logout>: %w", reqId, err)
 	}
 
-	if err := ac.service.Logout(token); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.logout>: %w", reqId, err)
+	if err := a.service.Logout(token); err != nil {
+		return fmt.Errorf("[%s] controller<Auth.Logout>: %w", reqId, err)
 	}
 
 	if err := reqres.HttpOk(w, http.StatusNoContent, nil); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.logout>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Logout>: %w", reqId, err)
 	}
 	return nil
 }
 
-func (ac authRoute) infer(w http.ResponseWriter, r *http.Request) error {
+func (a Auth) Infer(w http.ResponseWriter, r *http.Request) error {
 	reqId := middleware.GetReqID(r.Context())
 	token := r.Header.Get("Authorization")
 	if token == "" {
 		err := oops.Unauthorized{
 			Err: errors.New("Auth token not found"),
 			Msg: "Auth token not found"}
-		return fmt.Errorf("[%s] internal<authRoute.infer>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Infer>: %w", reqId, err)
 	}
 
-	userId, err := ac.service.Infer(token)
+	userId, err := a.service.Infer(token)
 	if err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.infer>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Infer>: %w", reqId, err)
 	}
 
 	w.Header().Add("X-User-Id", fmt.Sprintf("%d", userId))
 	if err := reqres.HttpOk(w, http.StatusNoContent, nil); err != nil {
-		return fmt.Errorf("[%s] internal<authRoute.infer>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Auth.Infer>: %w", reqId, err)
 	}
 	return nil
 }
 
-func NewAuthRoute(service authService) authRoute {
-	return authRoute{service}
+func NewAuth(service service.Auth) Auth {
+	return Auth{service}
 }
