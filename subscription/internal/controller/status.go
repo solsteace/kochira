@@ -12,20 +12,20 @@ import (
 	"github.com/solsteace/kochira/subscription/internal/service"
 )
 
-type Subscription struct {
-	service service.Subscription
+type Status struct {
+	service service.Status
 }
 
-func NewSubscription(service service.Subscription) Subscription {
-	return Subscription{service: service}
+func NewStatus(service service.Status) Status {
+	return Status{service: service}
 }
 
-func (s Subscription) FindSelf(w http.ResponseWriter, r *http.Request) error {
+func (s Status) FindSelf(w http.ResponseWriter, r *http.Request) error {
 	reqId := chiMiddleware.GetReqID(r.Context())
 	userId, _ := r.Context().Value(middleware.UserContextCtxKey).(middleware.UserContextCtxPayload)
 	result, err := s.service.GetByUserId(uint64(userId))
 	if err != nil {
-		return fmt.Errorf("[%s] internal<subscriptionRoute.Use>: %w", reqId, err)
+		return fmt.Errorf("[%s] controller<Status.FindSelf>: %w", reqId, err)
 	}
 
 	return reqres.HttpOk(w, http.StatusOK, map[string]any{
@@ -34,7 +34,7 @@ func (s Subscription) FindSelf(w http.ResponseWriter, r *http.Request) error {
 		"expiredAt": result.ExpiredAt()})
 }
 
-func (s Subscription) InitSubscription(msg amqp091.Delivery) error {
+func (s Status) InitSubscription(msg amqp091.Delivery) error {
 	payload, err := messaging.DeCreateSubscription(msg.Body)
 	if err != nil {
 		return fmt.Errorf("<consume callback>: %w", err)

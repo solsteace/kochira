@@ -53,10 +53,10 @@ func RunApp() {
 		time.Second*5)
 
 	subscriptionRepo := repository.NewPgSubscription(dbClient)
-	subscriptionService := service.NewSubscription(subscriptionRepo, subscriptionPerks)
-	subscriptionController := controller.NewSubscription(subscriptionService)
-	subscriptionRoute := route.NewSubscription(subscriptionController, userContext)
-	ApiRoute := route.NewApi(upSince)
+	statusService := service.NewStatus(subscriptionRepo, subscriptionPerks)
+	statusController := controller.NewStatus(statusService)
+	statusRoute := route.NewStatus(statusController, userContext)
+	apiRoute := route.NewApi(upSince)
 
 	// ================================
 	// Routes
@@ -67,11 +67,11 @@ func RunApp() {
 	app.Use(chiMiddleware.Recoverer)
 
 	v1 := chi.NewRouter()
-	subscriptionRoute.Use(v1)
+	statusRoute.Use(v1)
 
 	app.Mount("/api/v1", v1)
-	app.Get("/health", reqres.HttpHandlerWithError(ApiRoute.Health))
-	app.NotFound(reqres.HttpHandlerWithError(ApiRoute.NotFound))
+	app.Get("/health", reqres.HttpHandlerWithError(apiRoute.Health))
+	app.NotFound(reqres.HttpHandlerWithError(apiRoute.NotFound))
 
 	// ========================================
 	// Side effects & subscriptions
@@ -93,7 +93,7 @@ func RunApp() {
 	}
 	err = mq.AddConsumer(
 		"default",
-		subscriptionController.InitSubscription,
+		statusController.InitSubscription,
 		utility.NewDefaultAmqpConsumeOpts("hello2", false))
 	if err != nil {
 		err2 := fmt.Errorf("subscription<RunApp>: consumer init: %w", err)

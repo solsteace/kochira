@@ -18,7 +18,7 @@ func NewPerks(
 	return perks{expiration, linkLimit}
 }
 
-type SubscriptionPerks struct {
+type SubscriptionPerk struct {
 	basic   perks
 	premium perks
 
@@ -32,11 +32,11 @@ func NewSubscriptionPerks(
 	basic perks,
 	premium perks,
 	deviation time.Duration,
-) SubscriptionPerks {
-	return SubscriptionPerks{basic, premium, deviation}
+) SubscriptionPerk {
+	return SubscriptionPerk{basic, premium, deviation}
 }
 
-func (l SubscriptionPerks) Infer(subscription domain.Subscription) (time.Duration, uint) {
+func (l SubscriptionPerk) Infer(subscription domain.Subscription) (time.Duration, uint) {
 	expiration := subscription.ExpiredAt()
 	diff := expiration.Sub(time.Now()) - l.deviation
 	if diff <= 0 {
