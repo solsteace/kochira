@@ -1,4 +1,4 @@
-package internal
+package controller
 
 import (
 	"encoding/json"
@@ -9,27 +9,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/solsteace/go-lib/reqres"
 	"github.com/solsteace/kochira/link/internal/middleware"
+	"github.com/solsteace/kochira/link/internal/service"
 )
 
-type linkRoute struct {
-	service     linkService
-	userContext middleware.UserContext
+type Link struct {
+	service service.Link
 }
 
-func (lr linkRoute) Use(parent *chi.Mux) {
-	link := chi.NewRouter()
-	link.Group(func(r chi.Router) {
-		r.Use(lr.userContext.Handle)
-		r.Get("/my", reqres.HttpHandlerWithError(lr.getSelf))
-		r.Get("/my/{id}", reqres.HttpHandlerWithError(lr.getById))
-		r.Post("/", reqres.HttpHandlerWithError(lr.create))
-		r.Put("/{id}", reqres.HttpHandlerWithError(lr.updateById))
-		r.Delete("/{id}", reqres.HttpHandlerWithError(lr.deleteById))
-	})
-	parent.Mount("/link", link)
-}
-
-func (lr linkRoute) getSelf(w http.ResponseWriter, r *http.Request) error {
+func (lr Link) GetSelf(w http.ResponseWriter, r *http.Request) error {
 	var limit *uint
 	var page *uint
 	rq := r.URL.Query()
@@ -53,7 +40,7 @@ func (lr linkRoute) getSelf(w http.ResponseWriter, r *http.Request) error {
 	return reqres.HttpOk(w, http.StatusOK, result)
 }
 
-func (lr linkRoute) getById(w http.ResponseWriter, r *http.Request) error {
+func (lr Link) GetById(w http.ResponseWriter, r *http.Request) error {
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		return err
@@ -67,7 +54,7 @@ func (lr linkRoute) getById(w http.ResponseWriter, r *http.Request) error {
 	return reqres.HttpOk(w, http.StatusOK, result)
 }
 
-func (lr linkRoute) create(w http.ResponseWriter, r *http.Request) error {
+func (lr Link) Create(w http.ResponseWriter, r *http.Request) error {
 	reqPayload := new(struct {
 		Destination string `json:"destination"`
 	})
@@ -85,7 +72,7 @@ func (lr linkRoute) create(w http.ResponseWriter, r *http.Request) error {
 	return reqres.HttpOk(w, http.StatusCreated, nil)
 }
 
-func (lr linkRoute) updateById(w http.ResponseWriter, r *http.Request) error {
+func (lr Link) UpdateById(w http.ResponseWriter, r *http.Request) error {
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		return err
@@ -115,7 +102,7 @@ func (lr linkRoute) updateById(w http.ResponseWriter, r *http.Request) error {
 	return reqres.HttpOk(w, http.StatusOK, nil)
 }
 
-func (lr linkRoute) deleteById(w http.ResponseWriter, r *http.Request) error {
+func (lr Link) DeleteById(w http.ResponseWriter, r *http.Request) error {
 	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		return err
@@ -128,6 +115,6 @@ func (lr linkRoute) deleteById(w http.ResponseWriter, r *http.Request) error {
 	return reqres.HttpOk(w, http.StatusNoContent, nil)
 }
 
-func NewLinkRoute(service linkService, userContext middleware.UserContext) linkRoute {
-	return linkRoute{service, userContext}
+func NewLink(service service.Link) Link {
+	return Link{service}
 }

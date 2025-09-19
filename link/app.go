@@ -10,10 +10,11 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	_ "github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
-	"github.com/solsteace/go-lib/reqres"
-	"github.com/solsteace/kochira/link/internal"
+	"github.com/solsteace/kochira/link/internal/controller"
 	"github.com/solsteace/kochira/link/internal/middleware"
 	"github.com/solsteace/kochira/link/internal/repository"
+	"github.com/solsteace/kochira/link/internal/route"
+	"github.com/solsteace/kochira/link/internal/service"
 )
 
 func RunApp() {
@@ -31,41 +32,25 @@ func RunApp() {
 	// Layers
 	// ========================================
 	linkRepo := repository.NewPgLink(dbClient)
-	linkService := internal.NewLinkService(linkRepo)
-	linkRoute := internal.NewLinkRoute(linkService, userContext)
-	redirectionRoute := internal.NewRedirectionRoute(linkService)
+	linkService := service.NewLink(linkRepo)
+	redirectionController := controller.NewRedirection(linkService)
+	linkController := controller.NewLink(linkService)
+	linkRoute := route.NewLink(linkController, userContext)
+	redirectionRoute := route.NewRedirection(redirectionController)
+	apiRoute := route.NewApi(upSince)
 
 	// ========================================
 	// Routings
 	// ========================================
 	app := chi.NewRouter()
+	v1 := chi.NewRouter()
 	app.Use(chiMiddleware.Logger)
 	app.Use(chiMiddleware.Recoverer)
 
-	v1 := chi.NewRouter()
 	linkRoute.Use(v1)
 	redirectionRoute.Use(v1)
-
 	app.Mount("/api/v1", v1)
-	app.Get("/health", reqres.HttpHandlerWithError(
-		func(w http.ResponseWriter, r *http.Request) error {
-			return reqres.HttpOk(
-				w,
-				http.StatusOK,
-				map[string]any{
-					"msg": "Server is healthy",
-					"data": map[string]any{
-						"uptime": time.Now().Unix() - upSince,
-					}})
-		}))
-	app.NotFound(reqres.HttpHandlerWithError(
-		func(w http.ResponseWriter, r *http.Request) error {
-			return reqres.HttpOk(
-				w,
-				http.StatusNotFound,
-				map[string]any{
-					"msg": "The endpoint you're reaching wasn't found"})
-		}))
+	apiRoute.Use(app)
 
 	// ========================================
 	// Init

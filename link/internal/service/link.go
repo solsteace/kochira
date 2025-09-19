@@ -1,4 +1,4 @@
-package internal
+package service
 
 import (
 	"errors"
@@ -10,18 +10,18 @@ import (
 	"github.com/solsteace/kochira/link/internal/view"
 )
 
-type linkService struct {
+type Link struct {
 	repo repository.Link
 }
 
-func NewLinkService(
+func NewLink(
 	domainRepo repository.Link,
-) linkService {
-	return linkService{domainRepo}
+) Link {
+	return Link{domainRepo}
 }
 
 // CRUD get many
-func (ls linkService) GetSelf(userId uint64, page, limit *uint) (
+func (ls Link) GetSelf(userId uint64, page, limit *uint) (
 	[]view.Link, error,
 ) {
 	qParams := repository.NewLinkQueryParams(page, limit)
@@ -33,7 +33,7 @@ func (ls linkService) GetSelf(userId uint64, page, limit *uint) (
 }
 
 // CRUD get one
-func (ls linkService) GetById(userId, id uint64) (
+func (ls Link) GetById(userId, id uint64) (
 	view.Link, error,
 ) {
 	link, err := ls.repo.GetById(id)
@@ -44,7 +44,7 @@ func (ls linkService) GetById(userId, id uint64) (
 }
 
 // CRUD create
-func (ls linkService) Create(userId uint64, destination string) error {
+func (ls Link) Create(userId uint64, destination string) error {
 	now := time.Now()
 	newLink, err := domain.NewLink(
 		nil,
@@ -70,7 +70,7 @@ func (ls linkService) Create(userId uint64, destination string) error {
 }
 
 // CRUD update
-func (ls linkService) UpdateById(
+func (ls Link) UpdateById(
 	userId uint64,
 	id uint64,
 	shortened string,
@@ -108,7 +108,7 @@ func (ls linkService) UpdateById(
 }
 
 // CRUD delete
-func (ls linkService) DeleteById(userId, id uint64) error {
+func (ls Link) DeleteById(userId, id uint64) error {
 	link, err := ls.repo.GetById(id)
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (ls linkService) DeleteById(userId, id uint64) error {
 }
 
 // Redirects the user to the destination based on given shortened URI
-func (ls linkService) Redirect(shortened string) (string, error) {
+func (ls Link) Redirect(shortened string) (string, error) {
 	link, err := ls.repo.FindRedirection(shortened)
 	if err != nil {
 		return "", err
@@ -141,7 +141,7 @@ func (ls linkService) Redirect(shortened string) (string, error) {
 }
 
 // Activates a link, if the user is still eligible to do so
-func (ls linkService) Initialize(
+func (ls Link) Initialize(
 	id uint64,
 	userId uint64,
 	lifetime time.Duration,
