@@ -7,13 +7,13 @@ import (
 )
 
 type redirection struct {
-	controller controller.Redirection
+	controller controller.Link
 }
 
 func (r redirection) Use(parent *chi.Mux) {
 	parent.Get("/{shortened}", reqres.HttpHandlerWithError(r.controller.Redirect))
 }
 
-func NewRedirection(controller controller.Redirection) redirection {
+func NewRedirection(controller controller.Link) redirection {
 	return redirection{controller}
 }

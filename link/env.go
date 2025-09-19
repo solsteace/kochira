@@ -1,7 +1,7 @@
 package link
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -12,15 +12,18 @@ var (
 	envDbUrl string
 )
 
-func LoadEnv() {
+func LoadEnv() error {
 	switch port, err := strconv.ParseInt(os.Getenv("LINK_PORT"), 10, 32); {
 	case err != nil:
-		log.Fatalf("`LINK_PORT`: %s", err)
+		err := fmt.Errorf("`LINK_PORT`: %s", err)
+		return fmt.Errorf("internal<LoadEnv>: %w", err)
 	case port < 0 || port > 65535:
-		log.Fatal("`LINK_PORT: port should be between 0 - 65535 (get: %d)`", port)
+		err := fmt.Errorf("`LINK_PORT`: port should be between 0 - 65535 (get: %d)", port)
+		return fmt.Errorf("internal<LoadEnv>: %w", err)
 	default:
 		envPort = int(port)
 	}
 
 	envDbUrl = os.Getenv("LINK_DB_URL")
+	return nil
 }

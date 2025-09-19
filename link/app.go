@@ -17,13 +17,15 @@ import (
 	"github.com/solsteace/kochira/link/internal/service"
 )
 
+const moduleName = "kochira/link"
+
 func RunApp() {
 	// ========================================
 	// Utils
 	// ========================================
 	dbClient, err := sqlx.Connect("pgx", envDbUrl)
 	if err != nil {
-		log.Fatalf("Failed to connect to db: %v", err)
+		log.Fatalf("%s: DB connect: %v", moduleName, err)
 	}
 	upSince := time.Now().Unix()
 	userContext := middleware.NewUserContext("X-User-Id")
@@ -33,10 +35,9 @@ func RunApp() {
 	// ========================================
 	linkRepo := repository.NewPgLink(dbClient)
 	linkService := service.NewLink(linkRepo)
-	redirectionController := controller.NewRedirection(linkService)
 	linkController := controller.NewLink(linkService)
 	linkRoute := route.NewLink(linkController, userContext)
-	redirectionRoute := route.NewRedirection(redirectionController)
+	redirectionRoute := route.NewRedirection(linkController)
 	apiRoute := route.NewApi(upSince)
 
 	// ========================================
@@ -44,6 +45,7 @@ func RunApp() {
 	// ========================================
 	app := chi.NewRouter()
 	v1 := chi.NewRouter()
+	app.Use(chiMiddleware.RequestID)
 	app.Use(chiMiddleware.Logger)
 	app.Use(chiMiddleware.Recoverer)
 
@@ -55,6 +57,6 @@ func RunApp() {
 	// ========================================
 	// Init
 	// ========================================
-	fmt.Printf("Server's running at :%d\n", envPort)
+	fmt.Printf("%s: Server's running at :%d\n", moduleName, envPort)
 	http.ListenAndServe(fmt.Sprintf(":%d", envPort), app)
 }

@@ -64,24 +64,27 @@ func NewLink(
 
 	switch {
 	case len(shortened) > shortened_max_len:
-		return Link{}, oops.BadValues{
+		err := oops.BadValues{
 			Err: errors.New(fmt.Sprintf(
 				"Shortened could only be %d chars long at maximum",
 				shortened_max_len))}
+		return Link{}, fmt.Errorf("domain<NewLink>: %w", err)
 	case len(destination) > destination_max_len:
-		return Link{}, oops.BadValues{
+		err := oops.BadValues{
 			Err: errors.New(fmt.Sprintf(
 				"Destination could only be %d chars long at maximum",
 				destination_max_len))}
+		return Link{}, fmt.Errorf("domain<NewLink>: %w", err)
 	}
 
 	destinationUrl, err := url.Parse(destination)
 	if err != nil {
-		return Link{}, err
+		return Link{}, fmt.Errorf("domain<NewLink>: %w", err)
 	}
 	if destinationUrl.Scheme == "" {
-		return Link{}, oops.BadValues{
+		err := oops.BadValues{
 			Err: errors.New("destination should contain URL scheme")}
+		return Link{}, fmt.Errorf("domain<NewLink>: %w", err)
 	}
 
 	l := Link{

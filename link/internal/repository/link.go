@@ -19,7 +19,7 @@ type Link interface {
 	CountByUserId(userId uint64) (uint, error)
 
 	// Retrieves active redirection link. That is, link that is open and not expired yet
-	FindRedirection(shortened string) (view.Link, error)
+	GetByShortened(shortened string) (view.Link, error)
 
 	// Commands ===========
 

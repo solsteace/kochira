@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/solsteace/go-lib/oops"
@@ -14,20 +15,16 @@ type Link struct {
 	repo repository.Link
 }
 
-func NewLink(
-	domainRepo repository.Link,
-) Link {
+func NewLink(domainRepo repository.Link) Link {
 	return Link{domainRepo}
 }
 
 // CRUD get many
-func (ls Link) GetSelf(userId uint64, page, limit *uint) (
-	[]view.Link, error,
-) {
+func (ls Link) GetSelf(userId uint64, page, limit *uint) ([]view.Link, error) {
 	qParams := repository.NewLinkQueryParams(page, limit)
 	links, err := ls.repo.GetManyByUser(userId, qParams)
 	if err != nil {
-		return []view.Link{}, err
+		return []view.Link{}, fmt.Errorf("service<Link.GetSelf>: %w", err)
 	}
 	return links, nil
 }
@@ -38,7 +35,7 @@ func (ls Link) GetById(userId, id uint64) (
 ) {
 	link, err := ls.repo.GetById(id)
 	if err != nil {
-		return view.Link{}, err
+		return view.Link{}, fmt.Errorf("service<Link.GetById>: %w", err)
 	}
 	return link, nil
 }
@@ -55,13 +52,13 @@ func (ls Link) Create(userId uint64, destination string) error {
 		now,
 		now)
 	if err != nil {
-		return err
+		return fmt.Errorf("service<Link.Create>: %w", err)
 	}
 	newLink.NewShortened()
 
 	_, err = ls.repo.Create(newLink)
 	if err != nil {
-		return err
+		return fmt.Errorf("service<Link.Create>: %w", err)
 	}
 
 	// Publish "check.subscription" command
@@ -79,11 +76,12 @@ func (ls Link) UpdateById(
 ) error {
 	oldLink, err := ls.repo.Load(id)
 	if err != nil {
-		return err
+		return fmt.Errorf("service<Link.UpdateById>: %w", err)
 	}
 	if oldLink.UserId() != userId {
-		return oops.Forbidden{
+		err := oops.Forbidden{
 			Err: errors.New("You don't have access to this link")}
+		return fmt.Errorf("service<Link.UpdateById>: %w", err)
 	}
 
 	newLink, err := domain.NewLink(
@@ -95,11 +93,11 @@ func (ls Link) UpdateById(
 		oldLink.UpdatedAt(),
 		oldLink.ExpiredAt())
 	if err != nil {
-		return err
+		return fmt.Errorf("service<Link.UpdateById>: %w", err)
 	}
 
 	if err := ls.repo.Update(newLink); err != nil {
-		return err
+		return fmt.Errorf("service<Link.UpdateById>: %w", err)
 	}
 
 	// Publish "check.subscription" command
@@ -111,31 +109,37 @@ func (ls Link) UpdateById(
 func (ls Link) DeleteById(userId, id uint64) error {
 	link, err := ls.repo.GetById(id)
 	if err != nil {
-		return err
+		return fmt.Errorf("service<Link.DeleteById>: %w", err)
 	}
 	if link.UserId != userId {
-		return oops.Forbidden{
+		err := oops.Forbidden{
 			Err: errors.New("You don't have access to this link")}
+		return fmt.Errorf("service<Link.DeleteById>: %w", err)
 	}
 
-	return ls.repo.DeleteById(id)
+	if err := ls.repo.DeleteById(id); err != nil {
+		return fmt.Errorf("service<Link.DeleteById>: %w", err)
+	}
+	return nil
 }
 
 // Redirects the user to the destination based on given shortened URI
 func (ls Link) Redirect(shortened string) (string, error) {
-	link, err := ls.repo.FindRedirection(shortened)
+	link, err := ls.repo.GetByShortened(shortened)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("service<Link.Redirect>: %w", err)
 	}
 	switch {
-	case link.IsOpen == false:
-		return "", oops.Forbidden{
+	case !link.IsOpen:
+		err := oops.Forbidden{
 			Err: errors.New("This link is not opened by the owner"),
 			Msg: "This link is not opened by the owner"}
+		return "", fmt.Errorf("service<Link.Redirect>: %w", err)
 	case time.Now().Sub(link.ExpiredAt) > 0:
-		return "", oops.Forbidden{
+		err := oops.Forbidden{
 			Err: errors.New("This link had already expired"),
 			Msg: "This link had already expired"}
+		return "", fmt.Errorf("service<Link.Redirect>: %w", err)
 	}
 	return link.Destination, nil
 }
@@ -150,15 +154,16 @@ func (ls Link) Initialize(
 ) error {
 	link, err := ls.repo.GetById(id)
 	if err != nil {
-		return err
+		return fmt.Errorf("service<Link.Initialize>: %w", err)
 	}
 
 	linkCount, err := ls.repo.CountByUserId(link.UserId)
 	if err != nil {
-		return err
+		return fmt.Errorf("service<Link.Initialize>: %w", err)
 	}
 	if linkCount > linkCountLimit {
-		return errors.New("Link quota had exceeded")
+		err := errors.New("Link quota had exceeded")
+		return fmt.Errorf("service<Link.Initialize>: %w", err)
 	}
 
 	now := time.Now()
@@ -172,7 +177,7 @@ func (ls Link) Initialize(
 		now,
 		now.Add(lifetime))
 	if err := ls.repo.Update(newLink); err != nil {
-		return err
+		return fmt.Errorf("service<Link.Initialize>: %w", err)
 	}
 	return nil
 }

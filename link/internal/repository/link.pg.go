@@ -66,7 +66,7 @@ func (repo pgLink) GetMany(q linkQueryParams) ([]view.Link, error) {
 		q.limit,
 		q.Offset()}
 	if err := repo.db.Select(rows, query, args...); err != nil {
-		return []view.Link{}, err
+		return []view.Link{}, fmt.Errorf("repository<pgLink.GetMany>: %w", err)
 	}
 
 	links := []view.Link{}
@@ -86,7 +86,7 @@ func (repo pgLink) GetManyByUser(userId uint64, q linkQueryParams) ([]view.Link,
 		OFFSET $3`
 	args := []any{userId, q.limit, q.Offset()}
 	if err := repo.db.Select(rows, query, args...); err != nil {
-		return []view.Link{}, err
+		return []view.Link{}, fmt.Errorf("repository<pgLink.GetManyByUser>: %w", err)
 	}
 
 	links := []view.Link{}
@@ -105,13 +105,14 @@ func (repo pgLink) GetById(id uint64) (view.Link, error) {
 		LIMIT 1`
 	args := []any{id}
 	if err := repo.db.Select(rows, query, args...); err != nil {
-		return view.Link{}, err
+		return view.Link{}, fmt.Errorf("repository<pgLink.GetById>: %w", err)
 	}
 
 	if len(*rows) != 1 {
-		return view.Link{}, oops.NotFound{
+		err := oops.NotFound{
 			Err: errors.New(
 				fmt.Sprintf("link(id: %d) not found", id))}
+		return view.Link{}, fmt.Errorf("repository<pgLink.GetById>: %w", err)
 	}
 	return (*rows)[0].toView(), nil
 }
@@ -121,17 +122,17 @@ func (repo pgLink) CountByUserId(userId uint64) (uint, error) {
 	args := []any{userId}
 	result := repo.db.QueryRow(query, args)
 	if result.Err() != nil {
-		return 0, result.Err()
+		return 0, fmt.Errorf("repository<pgLink.CountByUserId>: %w", result.Err())
 	}
 
 	var count uint = 0
 	if err := result.Scan(count); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("repository<pgLink.CountByUserId>: %w", err)
 	}
 	return count, nil
 }
 
-func (repo pgLink) FindRedirection(shortened string) (view.Link, error) {
+func (repo pgLink) GetByShortened(shortened string) (view.Link, error) {
 	rows := new([]pgViewLinkRow)
 	query := `
 		SELECT * FROM "links"
@@ -139,13 +140,14 @@ func (repo pgLink) FindRedirection(shortened string) (view.Link, error) {
 		LIMIT 1`
 	args := []any{shortened}
 	if err := repo.db.Select(rows, query, args...); err != nil {
-		return view.Link{}, err
+		return view.Link{}, fmt.Errorf("repository<pgLink.GetByShortened>: %w", err)
 	}
 
 	if len(*rows) != 1 {
-		return view.Link{}, oops.NotFound{
+		err := oops.NotFound{
 			Err: errors.New(
 				fmt.Sprintf("link(shortened: %s) not found", shortened))}
+		return view.Link{}, fmt.Errorf("repository<pgLink.GetByShortened>: %w", err)
 	}
 	return (*rows)[0].toView(), nil
 }
@@ -194,15 +196,21 @@ func (repo pgLink) Load(id uint64) (domain.Link, error) {
 		LIMIT 1`
 	args := []any{id}
 	if err := repo.db.Select(rows, query, args...); err != nil {
-		return domain.Link{}, err
+		return domain.Link{}, fmt.Errorf("repository<pgLink.Load>: %w", err)
 	}
 
 	if len(*rows) != 1 {
-		return domain.Link{}, oops.NotFound{
+		err := oops.NotFound{
 			Err: errors.New(
 				fmt.Sprintf("link(id: %d) not found", id))}
+		return domain.Link{}, fmt.Errorf("repository<pgLink.Load>: %w", err)
 	}
-	return (*rows)[0].toLink()
+
+	link, err := (*rows)[0].toLink()
+	if err != nil {
+		return domain.Link{}, fmt.Errorf("repository<pgLink.Load>: %w", err)
+	}
+	return link, nil
 }
 
 func (repo pgLink) Create(l domain.Link) (uint64, error) {
@@ -225,14 +233,14 @@ func (repo pgLink) Create(l domain.Link) (uint64, error) {
 	link := newPgDomainLinkRow(l)
 	row, err := repo.db.NamedQuery(query, link)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("repository<pgLink.Create>: %w", err)
 	}
 
 	row.Next()
 	defer row.Close()
 	var insertId uint64 = 0
 	if err := row.Scan(&insertId); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("repository<pgLink.Create>: %w", err)
 	}
 
 	return insertId, nil
@@ -252,7 +260,7 @@ func (repo pgLink) Update(l domain.Link) error {
 	link := newPgDomainLinkRow(l)
 	_, err := repo.db.NamedExec(query, link)
 	if err != nil {
-		return err
+		return fmt.Errorf("repository<pgLink.Update>: %w", err)
 	}
 	return nil
 }
@@ -265,7 +273,7 @@ func (repo pgLink) DeleteById(id uint64) error {
 	args := []any{id}
 	_, err := repo.db.Exec(query, args...)
 	if err != nil {
-		return err
+		return fmt.Errorf("repository<pgLink.DeleteById>: %w", err)
 	}
 	return nil
 }

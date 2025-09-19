@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -29,9 +30,10 @@ func (uc UserContext) Handle(next http.Handler) http.Handler {
 			xUserId := r.Header.Get(uc.header)
 			userId, err := strconv.ParseUint(xUserId, 10, 64)
 			if err != nil {
-				return oops.BadRequest{
+				err := oops.BadRequest{
 					Err: err,
 					Msg: "Something went wrong during obtaining user context"}
+				return fmt.Errorf("middleware<UserContext.Handle>: %w", err)
 			}
 
 			var payload UserContextCtxPayload = UserContextCtxPayload(userId)
