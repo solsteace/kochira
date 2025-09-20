@@ -11,17 +11,17 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/solsteace/go-lib/token"
-	"github.com/solsteace/kochira/account/internal/cache"
 	"github.com/solsteace/kochira/account/internal/controller"
-	domainService "github.com/solsteace/kochira/account/internal/domain/service"
-	"github.com/solsteace/kochira/account/internal/repository"
+	"github.com/solsteace/kochira/account/internal/persistence"
 	"github.com/solsteace/kochira/account/internal/route"
 	"github.com/solsteace/kochira/account/internal/service"
 	"github.com/solsteace/kochira/account/internal/utility"
 	"github.com/valkey-io/valkey-go"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	authService "github.com/solsteace/kochira/account/internal/domain/auth/service"
 )
 
 const moduleName = "kochira/account"
@@ -69,17 +69,14 @@ func RunApp() {
 	// ========================================
 	// Layers
 	// ========================================
-	authAttemptDomainService := domainService.NewAuthAttempt(
-		3,
-		3,
-		120*time.Second,
-		10*time.Second)
+	authJailer := authService.NewJailer(
+		3, 3, 120*time.Second, 10*time.Second)
 
-	accountRepo := repository.NewPgUser(dbClient)
-	authAttemptCache := cache.NewValkeyAuthAttempt(
+	accountRepo := persistence.NewPgUser(dbClient)
+	authAttemptCache := persistence.NewValkeyAuthAttempt(
 		cacheClient,
-		authAttemptDomainService.RetentionTime(15*time.Second))
-	tokenCache := cache.NewValkeyToken(
+		authJailer.RetentionTime(15*time.Second))
+	tokenCache := persistence.NewValkeyToken(
 		cacheClient,
 		time.Duration(envRefreshTokenLifetime)*time.Second)
 
@@ -90,7 +87,7 @@ func RunApp() {
 		secretHandler,
 		accessTokenHandler,
 		refreshTokenHandler,
-		authAttemptDomainService)
+		authJailer)
 	controller := controller.NewAuth(authService)
 	authRoute := route.NewAuth(controller)
 	apiRoute := route.NewApi(upSince)

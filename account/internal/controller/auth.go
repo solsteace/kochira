@@ -145,7 +145,7 @@ func (a Auth) Infer(w http.ResponseWriter, r *http.Request) error {
 
 func (a Auth) PublishNewUser(maxUser uint, sender func(body []byte) error) error {
 	makePayload := messaging.SerCreateSubscription
-	if err := a.service.HandleNewUsers(maxUser, makePayload, sender); err != nil {
+	if err := a.service.HandleRegisteredUsers(maxUser, makePayload, sender); err != nil {
 		return fmt.Errorf("[%s] controller<Auth.PublishNewUser>: %w", err)
 	}
 	return nil

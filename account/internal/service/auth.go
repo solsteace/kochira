@@ -6,50 +6,53 @@ import (
 	"time"
 
 	"github.com/solsteace/go-lib/oops"
-	"github.com/solsteace/go-lib/secret"
 	"github.com/solsteace/go-lib/token"
-	"github.com/solsteace/kochira/account/internal/cache"
-	"github.com/solsteace/kochira/account/internal/domain"
-	domainService "github.com/solsteace/kochira/account/internal/domain/service"
-	"github.com/solsteace/kochira/account/internal/repository"
+
+	"github.com/solsteace/kochira/account/internal/domain/account"
+	"github.com/solsteace/kochira/account/internal/domain/auth"
+
+	accountService "github.com/solsteace/kochira/account/internal/domain/account/service"
+	accountStore "github.com/solsteace/kochira/account/internal/domain/account/store"
+	authService "github.com/solsteace/kochira/account/internal/domain/auth/service"
+	authStore "github.com/solsteace/kochira/account/internal/domain/auth/store"
 )
 
 type Auth struct {
-	userRepo           repository.User
-	authAttemptCache   cache.AuthAttempt
-	tokenCache         cache.Token
-	secret             secret.Handler
-	refreshToken       token.Handler[token.Auth]
-	accessToken        token.Handler[token.Auth]
-	authAttemptService domainService.AuthAttempt
+	userRepo         accountStore.User
+	authAttemptCache authStore.Attempt
+	tokenCache       authStore.Token
+	refreshToken     token.Handler[token.Auth]
+	accessToken      token.Handler[token.Auth]
+	jailer           authService.Jailer
+	hashHandler      accountService.HashHandler
 }
 
 func NewAuth(
-	userRepo repository.User,
-	authAttemptCache cache.AuthAttempt,
-	tokenCache cache.Token,
-	secret secret.Handler,
+	userRepo accountStore.User,
+	authAttemptCache authStore.Attempt,
+	tokenCache authStore.Token,
+	hasher accountService.HashHandler,
 	refreshToken token.Handler[token.Auth],
 	accessToken token.Handler[token.Auth],
-	authAttemptService domainService.AuthAttempt,
+	authJailer authService.Jailer,
 ) Auth {
 	return Auth{
 		userRepo,
 		authAttemptCache,
 		tokenCache,
-		secret,
 		refreshToken,
 		accessToken,
-		authAttemptService}
+		authJailer,
+		hasher}
 }
 
 func (as Auth) Register(username, password, email string) error {
-	digest, err := as.secret.Generate(password)
+	digest, err := as.hashHandler.Generate(password)
 	if err != nil {
 		return fmt.Errorf("service<Auth.Register>: %w", err)
 	}
 
-	user, err := domain.NewUser(nil, username, string(digest), email)
+	user, err := account.NewUser(nil, username, string(digest), email)
 	if err != nil {
 		return fmt.Errorf("service<Auth.Register>: %w", err)
 	}
@@ -70,23 +73,19 @@ func (as Auth) Login(username, password string) (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("service<Auth.Login>: %w", err)
 	}
-	jailTime := as.authAttemptService.CalculateJailTime(attempts)
-	if jailTime > 0 {
-		err := oops.Unauthorized{
-			Msg: fmt.Sprintf(
-				"Failed too many times! Try again in %.2fs", jailTime.Seconds())}
+	if err := as.jailer.IsJailed(attempts); err != nil {
 		return "", "", fmt.Errorf("service<Auth.Login>: %w", err)
 	}
 
-	if err := as.secret.Compare(user.Password, password); err != nil {
-		attempt, _ := domain.NewAuthAttempt(false, time.Now())
-		if err := as.authAttemptCache.Add(user.Id, attempt); err != nil {
+	authOk := true
+	if err := user.ComparePassword(as.hashHandler.Compare, password); err != nil {
+		if !errors.As(err, &oops.Unauthorized{}) {
 			return "", "", fmt.Errorf("service<Auth.Login>: %w", err)
 		}
-		return "", "", fmt.Errorf("service<Auth.Login>: %w", err)
+		authOk = false
 	}
-	attempt, _ := domain.NewAuthAttempt(true, time.Now())
-	if err := as.authAttemptCache.Add(user.Id, attempt); err != nil {
+	newAttempt, _ := auth.NewAttempt(authOk, time.Now())
+	if err := as.authAttemptCache.Add(user.Id, newAttempt); err != nil {
 		return "", "", fmt.Errorf("service<Auth.Login>: %w", err)
 	}
 
@@ -163,7 +162,7 @@ func (as Auth) Infer(token string) (uint64, error) {
 	return uint64(payload.UserId), nil
 }
 
-func (as Auth) HandleNewUsers(
+func (as Auth) HandleRegisteredUsers(
 	maxCount uint,
 	payloader func(users []uint64) ([]byte, error),
 	send func([]byte) error,

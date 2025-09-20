@@ -1,4 +1,4 @@
-package cache
+package store
 
 type Token interface {
 	Grant(userId uint, token string) error
