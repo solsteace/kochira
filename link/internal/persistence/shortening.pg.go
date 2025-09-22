@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -80,14 +81,8 @@ func newPgshorteningLinkRow(l shortening.Link) pgShorteningRow {
 
 func (repo pgLink) GetMany(q ShorteningQueryParams) ([]shortening.Link, error) {
 	rows := new([]pgShorteningRow)
-	query := `
-		SELECT * 
-		FROM "links" 
-		LIMIT $1 
-		OFFSET $2`
-	args := []any{
-		q.limit,
-		q.Offset()}
+	query := `SELECT * FROM "links" LIMIT $1 OFFSET $2`
+	args := []any{q.limit, q.Offset()}
 	if err := repo.db.Select(rows, query, args...); err != nil {
 		return []shortening.Link{}, fmt.Errorf("repository<pgLink.GetMany>: %w", err)
 	}
@@ -105,12 +100,7 @@ func (repo pgLink) GetMany(q ShorteningQueryParams) ([]shortening.Link, error) {
 
 func (repo pgLink) GetManyByUser(userId uint64, q ShorteningQueryParams) ([]shortening.Link, error) {
 	rows := new([]pgShorteningRow)
-	query := `
-		SELECT * 
-		FROM "links" 
-		WHERE user_id = $1
-		LIMIT $2
-		OFFSET $3`
+	query := `SELECT * FROM "links" WHERE user_id = $1 LIMIT $2 OFFSET $3`
 	args := []any{userId, q.limit, q.Offset()}
 	if err := repo.db.Select(rows, query, args...); err != nil {
 		return []shortening.Link{}, fmt.Errorf("repository<pgLink.GetManyByUser>: %w", err)
@@ -128,65 +118,28 @@ func (repo pgLink) GetManyByUser(userId uint64, q ShorteningQueryParams) ([]shor
 }
 
 func (repo pgLink) GetById(id uint64) (shortening.Link, error) {
-	rows := new([]pgShorteningRow)
-	query := `
-		SELECT * 
-		FROM links 
-		WHERE id = $1 
-		LIMIT 1`
+	row := new(pgShorteningRow)
+	query := `SELECT * FROM links WHERE id = $1 LIMIT 1`
 	args := []any{id}
-	if err := repo.db.Select(rows, query, args...); err != nil {
-		return shortening.Link{}, fmt.Errorf("repository<pgLink.GetById>: %w", err)
+	if err := repo.db.Get(row, query, args...); err != nil {
+		l := shortening.Link{}
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			err2 := oops.NotFound{
+				Err: err,
+				Msg: fmt.Sprintf("link(id:%d) not found", id)}
+			return l, fmt.Errorf("persistence<pgLink.GetById>: %w", err2)
+		default:
+			return l, fmt.Errorf("persistence<pgLink.GetById>: %w", err)
+		}
 	}
 
-	if len(*rows) != 1 {
-		err := oops.NotFound{
-			Err: errors.New(
-				fmt.Sprintf("link(id: %d) not found", id))}
-		return shortening.Link{}, fmt.Errorf("repository<pgLink.GetById>: %w", err)
-	}
-	return (*rows)[0].toShortening()
-}
-
-func (repo pgLink) CountByUserId(userId uint64) (uint, error) {
-	query := `SELECT COUNT(*) as n_links FROM links WHERE user_id = ?`
-	args := []any{userId}
-	result := repo.db.QueryRow(query, args)
-	if result.Err() != nil {
-		return 0, fmt.Errorf("repository<pgLink.CountByUserId>: %w", result.Err())
-	}
-
-	var count uint = 0
-	if err := result.Scan(count); err != nil {
-		return 0, fmt.Errorf("repository<pgLink.CountByUserId>: %w", err)
-	}
-	return count, nil
-}
-
-func (repo pgLink) Load(id uint64) (shortening.Link, error) {
-	rows := new([]pgShorteningRow)
-	query := `
-		SELECT * 
-		FROM links 
-		WHERE id = $1 
-		LIMIT 1`
-	args := []any{id}
-	if err := repo.db.Select(rows, query, args...); err != nil {
-		return shortening.Link{}, fmt.Errorf("repository<pgLink.Load>: %w", err)
-	}
-
-	if len(*rows) != 1 {
-		err := oops.NotFound{
-			Err: errors.New(
-				fmt.Sprintf("link(id: %d) not found", id))}
-		return shortening.Link{}, fmt.Errorf("repository<pgLink.Load>: %w", err)
-	}
-
-	link, err := (*rows)[0].toShortening()
+	s, err := row.toShortening()
 	if err != nil {
-		return shortening.Link{}, fmt.Errorf("repository<pgLink.Load>: %w", err)
+		return shortening.Link{}, fmt.Errorf("persistence<pgLink.GetById>: %w", err)
 	}
-	return link, nil
+	return s, nil
+
 }
 
 func (repo pgLink) Create(l shortening.Link) (uint64, error) {
@@ -242,14 +195,26 @@ func (repo pgLink) Update(l shortening.Link) error {
 }
 
 func (repo pgLink) DeleteById(id uint64) error {
-	query := `
-		DELETE 
-		FROM "links"
-		WHERE id = $1`
+	query := `DELETE FROM "links" WHERE id = $1`
 	args := []any{id}
 	_, err := repo.db.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("repository<pgLink.DeleteById>: %w", err)
 	}
 	return nil
+}
+
+func (repo pgLink) CountByUserId(userId uint64) (uint, error) {
+	query := `SELECT COUNT(*) as n_links FROM links WHERE user_id = ?`
+	args := []any{userId}
+	result := repo.db.QueryRow(query, args)
+	if result.Err() != nil {
+		return 0, fmt.Errorf("repository<pgLink.CountByUserId>: %w", result.Err())
+	}
+
+	var count uint = 0
+	if err := result.Scan(count); err != nil {
+		return 0, fmt.Errorf("repository<pgLink.CountByUserId>: %w", err)
+	}
+	return count, nil
 }

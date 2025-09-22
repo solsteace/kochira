@@ -16,8 +16,6 @@ type Link[queryParams any] interface {
 	CountByUserId(userId uint64) (uint, error)
 
 	// Commands ===========
-
-	Load(id uint64) (shortening.Link, error)
 	Create(l shortening.Link) (uint64, error)
 	Update(l shortening.Link) error
 	DeleteById(id uint64) error

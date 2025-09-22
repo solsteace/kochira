@@ -15,7 +15,6 @@ type Shortening struct {
 	store store.Link[persistence.ShorteningQueryParams]
 }
 
-// CRUD get many
 func (s Shortening) GetSelf(userId uint64, page, limit *uint) ([]shortening.Link, error) {
 	qParams := persistence.NewShorteningQueryParams(page, limit)
 	links, err := s.store.GetManyByUser(userId, qParams)
@@ -25,7 +24,6 @@ func (s Shortening) GetSelf(userId uint64, page, limit *uint) ([]shortening.Link
 	return links, nil
 }
 
-// CRUD get one
 func (s Shortening) GetById(userId, id uint64) (shortening.Link, error) {
 	link, err := s.store.GetById(id)
 	if err != nil {
@@ -34,7 +32,6 @@ func (s Shortening) GetById(userId, id uint64) (shortening.Link, error) {
 	return link, nil
 }
 
-// CRUD create
 func (s Shortening) Create(userId uint64, destination string) error {
 	now := time.Now()
 	newLink, err := shortening.NewLink(
@@ -55,12 +52,9 @@ func (s Shortening) Create(userId uint64, destination string) error {
 		return fmt.Errorf("service<Shortening.Create>: %w", err)
 	}
 
-	// Publish "check.subscription" command
-
 	return nil
 }
 
-// CRUD update
 func (s Shortening) UpdateById(
 	userId uint64,
 	id uint64,
@@ -68,7 +62,7 @@ func (s Shortening) UpdateById(
 	destination string,
 	IsOpen bool,
 ) error {
-	oldLink, err := s.store.Load(id)
+	oldLink, err := s.store.GetById(id)
 	if err != nil {
 		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
 	}
@@ -93,8 +87,6 @@ func (s Shortening) UpdateById(
 	if err := s.store.Update(newLink); err != nil {
 		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
 	}
-
-	// Publish "check.subscription" command
 
 	return nil
 }

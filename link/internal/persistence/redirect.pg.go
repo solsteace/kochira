@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -18,21 +19,21 @@ func (row pgShorteningRow) toRedirect() redirect.Link {
 }
 
 func (repo pgLink) GetByShortened(shortened string) (redirect.Link, error) {
-	rows := new([]pgShorteningRow)
-	query := `
-		SELECT * FROM "links"
-		WHERE shortened = $1
-		LIMIT 1`
+	row := new(pgShorteningRow)
+	query := `SELECT * FROM "links" WHERE shortened = $1 LIMIT 1`
 	args := []any{shortened}
-	if err := repo.db.Select(rows, query, args...); err != nil {
-		return redirect.Link{}, fmt.Errorf("repository<pgLink.GetByShortened>: %w", err)
+	if err := repo.db.Get(row, query, args...); err != nil {
+		l := redirect.Link{}
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			err2 := oops.NotFound{
+				Err: err,
+				Msg: fmt.Sprintf("link(shortened:%d) not found", shortened)}
+			return l, fmt.Errorf("persistence<pgLink.GetByShortened>: %w", err2)
+		default:
+			return l, fmt.Errorf("persistence<pgLink.GetByShortened>: %w", err)
+		}
 	}
 
-	if len(*rows) != 1 {
-		err := oops.NotFound{
-			Err: errors.New(
-				fmt.Sprintf("link(shortened: %s) not found", shortened))}
-		return redirect.Link{}, fmt.Errorf("repository<pgLink.GetByShortened>: %w", err)
-	}
-	return (*rows)[0].toRedirect(), nil
+	return row.toRedirect(), nil
 }
