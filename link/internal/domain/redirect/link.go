@@ -1,13 +1,16 @@
-package view
+package redirect
 
 import "time"
 
 type Link struct {
 	Id          uint64
-	UserId      uint64
 	Shortened   string
 	Destination string
 	IsOpen      bool
-	UpdatedAt   time.Time
 	ExpiredAt   time.Time
+}
+
+func (l Link) IsRedirectable() bool {
+	diff := time.Now().Sub(l.ExpiredAt)
+	return l.IsOpen && diff < 0
 }

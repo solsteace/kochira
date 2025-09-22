@@ -12,7 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/solsteace/kochira/link/internal/controller"
 	"github.com/solsteace/kochira/link/internal/middleware"
-	"github.com/solsteace/kochira/link/internal/repository"
+	"github.com/solsteace/kochira/link/internal/persistence"
 	"github.com/solsteace/kochira/link/internal/route"
 	"github.com/solsteace/kochira/link/internal/service"
 )
@@ -33,12 +33,15 @@ func RunApp() {
 	// ========================================
 	// Layers
 	// ========================================
-	linkRepo := repository.NewPgLink(dbClient)
-	linkService := service.NewLink(linkRepo)
-	linkController := controller.NewLink(linkService)
-	linkRoute := route.NewLink(linkController, userContext)
-	redirectionRoute := route.NewRedirection(linkController)
-	apiRoute := route.NewApi(upSince)
+	linkRepo := persistence.NewPgLink(dbClient)
+
+	shorteningService := service.NewShortening(linkRepo)
+	shorteningController := controller.NewShortening(shorteningService)
+	shorteningRoute := route.NewShortening(shorteningController, userContext)
+
+	redirectSerivce := service.NewRedirect(linkRepo)
+	redirectController := controller.NewRedirect(redirectSerivce)
+	redirectionRoute := route.NewRedirect(redirectController)
 
 	// ========================================
 	// Routings
@@ -49,10 +52,10 @@ func RunApp() {
 	app.Use(chiMiddleware.Logger)
 	app.Use(chiMiddleware.Recoverer)
 
-	linkRoute.Use(v1)
+	shorteningRoute.Use(v1)
 	redirectionRoute.Use(v1)
 	app.Mount("/api/v1", v1)
-	apiRoute.Use(app)
+	route.NewApi(upSince).Use(app)
 
 	// ========================================
 	// Init

@@ -7,24 +7,24 @@ import (
 	"github.com/solsteace/kochira/link/internal/middleware"
 )
 
-type link struct {
-	controller  controller.Link
+type shortening struct {
+	controller  controller.Shortening
 	userContext middleware.UserContext
 }
 
-func (l link) Use(parent *chi.Mux) {
-	link := chi.NewRouter()
-	link.Group(func(r chi.Router) {
-		r.Use(l.userContext.Handle)
-		r.Get("/my", reqres.HttpHandlerWithError(l.controller.GetSelf))
-		r.Get("/my/{id}", reqres.HttpHandlerWithError(l.controller.GetById))
-		r.Post("/", reqres.HttpHandlerWithError(l.controller.Create))
-		r.Put("/{id}", reqres.HttpHandlerWithError(l.controller.UpdateById))
-		r.Delete("/{id}", reqres.HttpHandlerWithError(l.controller.DeleteById))
+func (s shortening) Use(parent *chi.Mux) {
+	shortening := chi.NewRouter()
+	shortening.Group(func(r chi.Router) {
+		r.Use(s.userContext.Handle)
+		r.Get("/my", reqres.HttpHandlerWithError(s.controller.GetSelf))
+		r.Get("/my/{id}", reqres.HttpHandlerWithError(s.controller.GetById))
+		r.Post("/", reqres.HttpHandlerWithError(s.controller.Create))
+		r.Put("/{id}", reqres.HttpHandlerWithError(s.controller.UpdateById))
+		r.Delete("/{id}", reqres.HttpHandlerWithError(s.controller.DeleteById))
 	})
-	parent.Mount("/link", link)
+	parent.Mount("/link", shortening)
 }
 
-func NewLink(controller controller.Link, userContext middleware.UserContext) link {
-	return link{controller, userContext}
+func NewShortening(controller controller.Shortening, userContext middleware.UserContext) shortening {
+	return shortening{controller, userContext}
 }
