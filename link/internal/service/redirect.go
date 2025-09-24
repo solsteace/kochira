@@ -1,11 +1,8 @@
 package service
 
 import (
-	"errors"
 	"fmt"
-	"time"
 
-	"github.com/solsteace/go-lib/oops"
 	"github.com/solsteace/kochira/link/internal/domain/redirect/store"
 )
 
@@ -19,19 +16,12 @@ func (ls Redirect) Go(shortened string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("service<Redirect.Go>: %w", err)
 	}
-	switch {
-	case !link.IsOpen:
-		err := oops.Forbidden{
-			Err: errors.New("This link is not opened by the owner"),
-			Msg: "This link is not opened by the owner"}
-		return "", fmt.Errorf("service<Redirect.Go>: %w", err)
-	case time.Now().Sub(link.ExpiredAt) > 0:
-		err := oops.Forbidden{
-			Err: errors.New("This link had already expired"),
-			Msg: "This link had already expired"}
+
+	destination, err := link.Access()
+	if err != nil {
 		return "", fmt.Errorf("service<Redirect.Go>: %w", err)
 	}
-	return link.Destination, nil
+	return destination, nil
 }
 
 func NewRedirect(store store.Shortening) Redirect {

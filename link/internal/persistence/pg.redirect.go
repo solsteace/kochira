@@ -9,7 +9,7 @@ import (
 	"github.com/solsteace/kochira/link/internal/domain/redirect"
 )
 
-func (row pgShorteningRow) toRedirect() redirect.Link {
+func (row pgLink) toRedirect() redirect.Link {
 	return redirect.Link{
 		Id:          row.Id,
 		Shortened:   row.Shortened,
@@ -18,8 +18,8 @@ func (row pgShorteningRow) toRedirect() redirect.Link {
 		ExpiredAt:   row.ExpiredAt}
 }
 
-func (repo pgLink) GetByShortened(shortened string) (redirect.Link, error) {
-	row := new(pgShorteningRow)
+func (repo pg) GetByShortened(shortened string) (redirect.Link, error) {
+	row := new(pgLink)
 	query := `SELECT * FROM "links" WHERE shortened = $1 LIMIT 1`
 	args := []any{shortened}
 	if err := repo.db.Get(row, query, args...); err != nil {

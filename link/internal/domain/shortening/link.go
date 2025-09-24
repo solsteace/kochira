@@ -27,7 +27,7 @@ type Link struct {
 }
 
 // Sets shortened link
-func (l *Link) NewShortened() {
+func (l *Link) Shorten() {
 	shortened := make([]byte, 15)
 	for i, _ := range shortened {
 		idx := rand.Int() % len(shortened_chars)
@@ -38,6 +38,12 @@ func (l *Link) NewShortened() {
 
 func (l Link) HadExpired() bool {
 	return time.Now().After(l.expiredAt)
+}
+func (l Link) AccessibleBy(userId uint64) bool {
+	return l.userId == userId
+}
+func (l Link) ShortChanged(short string) bool {
+	return l.shortened != short
 }
 
 func (l Link) Id() uint64           { return l.id }

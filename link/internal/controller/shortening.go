@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/solsteace/go-lib/reqres"
+	shorteningMsg "github.com/solsteace/kochira/link/internal/domain/shortening/messaging"
+	outsideMessaging "github.com/solsteace/kochira/link/internal/messaging"
 	"github.com/solsteace/kochira/link/internal/middleware"
 	"github.com/solsteace/kochira/link/internal/service"
 
@@ -15,7 +17,9 @@ import (
 )
 
 type Shortening struct {
-	service service.Shortening
+	service           service.Shortening
+	checkSubscription outsideMessaging.CheckSubscriptionMessenger
+	finishShortening  outsideMessaging.FinishShorteningMessenger
 }
 
 func (lr Shortening) GetSelf(w http.ResponseWriter, r *http.Request) error {
@@ -141,6 +145,46 @@ func (lr Shortening) DeleteById(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// ===============================
+// Event handling
+// ===============================
+
+func (s Shortening) ListenFinishShortening(msg []byte) error {
+	payload, err := s.finishShortening.FromMsg(msg)
+	if err != nil {
+		return fmt.Errorf("controller<Shortening.ListenFinishShortening>: %w", err)
+	}
+
+	if s.finishShortening.Version != payload.Meta.Version {
+		return fmt.Errorf(
+			"controller<Shortening.ListenFinishShortening>: "+
+				"incompatible version between messenger(v:%d) and message(v:%d)",
+			s.finishShortening.Version, payload.Meta.Version)
+	}
+
+	switch payload.Meta.Source {
+	case shorteningMsg.LinkShortenedName:
+		err = s.service.HandleLinkShortened(
+			payload.Data.Id,
+			payload.Data.UserId,
+			payload.Data.Perk.Lifetime,
+			payload.Data.Perk.Limit)
+	case shorteningMsg.ShortConfiguredName:
+		err = s.service.HandleShortConfigured(
+			payload.Data.Id,
+			payload.Data.UserId,
+			payload.Data.Perk.AllowEdit)
+	}
+	if err != nil {
+		return fmt.Errorf("controller<Shortening.ListenFinishShortening>: %w", err)
+	}
+	return nil
+}
+
+// Creates new `Shortening` and initiates essentials for messaging purposes
 func NewShortening(service service.Shortening) Shortening {
-	return Shortening{service}
+	return Shortening{
+		service,
+		outsideMessaging.CheckSubscriptionMessenger{Version: 1},
+		outsideMessaging.FinishShorteningMessenger{Version: 1}}
 }

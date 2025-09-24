@@ -9,6 +9,7 @@ import (
 var (
 	envPort int
 
+	envMqUrl string
 	envDbUrl string
 )
 
@@ -24,6 +25,7 @@ func LoadEnv() error {
 		envPort = int(port)
 	}
 
+	envMqUrl = os.Getenv("LINK_MQ_URL")
 	envDbUrl = os.Getenv("LINK_DB_URL")
 	return nil
 }
