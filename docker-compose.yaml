@@ -12,6 +12,7 @@ services:
       dockerfile: ./monolith/Dockerfile
       target: devel
     volumes:
+      - ./_migration:/kochira/_migration
       - ./account:/kochira/account
       - ./link:/kochira/link
       - ./monolith:/kochira/monolith
