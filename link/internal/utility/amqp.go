@@ -64,15 +64,15 @@ func (a *Amqp) Start(url string, initReady chan<- struct{}) {
 			continue
 		}
 
-		if isFirstConnection {
-			initReady <- struct{}{}
-			close(initReady)
-		}
-
 		a.connMu.Lock()
 		a.conn = conn
 		a.closeNotifier = a.conn.NotifyClose(make(chan *amqp091.Error))
 		a.connMu.Unlock()
+
+		if isFirstConnection {
+			initReady <- struct{}{}
+			close(initReady)
+		}
 
 		isFirstConnection = false
 		backoff = time.Second
