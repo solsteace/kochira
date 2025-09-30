@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/rabbitmq/amqp091-go"
 	"github.com/solsteace/go-lib/reqres"
 	"github.com/solsteace/go-lib/temporary/messaging"
 	"github.com/solsteace/kochira/subscription/internal/middleware"
@@ -34,8 +33,8 @@ func (s Status) FindSelf(w http.ResponseWriter, r *http.Request) error {
 		"expiredAt": result.ExpiredAt()})
 }
 
-func (s Status) InitSubscription(msg amqp091.Delivery) error {
-	payload, err := messaging.DeCreateSubscription(msg.Body)
+func (s Status) InitSubscription(msg []byte) error {
+	payload, err := messaging.DeCreateSubscription(msg)
 	if err != nil {
 		return fmt.Errorf("<consume callback>: %w", err)
 	}

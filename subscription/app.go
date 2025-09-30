@@ -74,10 +74,8 @@ func RunApp() {
 	// Side effects & subscriptions
 	// ========================================
 	mq := utility.NewAmqp()
-	mqMonitorEnd := make(chan struct{})
 	mqInitReady := make(chan struct{})
 	go mq.Start(envMqUrl, mqInitReady)
-	go mq.Monitor(mqMonitorEnd)
 
 	<-mqInitReady
 	if err := mq.AddChannel("default"); err != nil {
