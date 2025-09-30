@@ -7,12 +7,12 @@ import (
 	"github.com/solsteace/kochira/subscription/internal/middleware"
 )
 
-type status struct {
-	controller  controller.Status
+type subscription struct {
+	controller  controller.Subscription
 	userContext middleware.UserContext
 }
 
-func (s status) Use(parent *chi.Mux) {
+func (s subscription) Use(parent *chi.Mux) {
 	status := chi.NewRouter()
 	status.Group(func(r chi.Router) {
 		r.Use(s.userContext.Handle)
@@ -21,9 +21,9 @@ func (s status) Use(parent *chi.Mux) {
 	parent.Mount("/status", status)
 }
 
-func NewStatus(
-	controller controller.Status,
+func NewSubscription(
+	controller controller.Subscription,
 	userContext middleware.UserContext,
-) status {
-	return status{controller, userContext}
+) subscription {
+	return subscription{controller, userContext}
 }

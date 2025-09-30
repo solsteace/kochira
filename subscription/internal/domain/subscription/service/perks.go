@@ -3,7 +3,7 @@ package service
 import (
 	"time"
 
-	"github.com/solsteace/kochira/subscription/internal/domain"
+	"github.com/solsteace/kochira/subscription/internal/domain/subscription"
 )
 
 type perks struct {
@@ -18,7 +18,7 @@ func NewPerks(
 	return perks{expiration, linkLimit}
 }
 
-type SubscriptionPerk struct {
+type PerkInferer struct {
 	basic   perks
 	premium perks
 
@@ -28,15 +28,15 @@ type SubscriptionPerk struct {
 	deviation time.Duration
 }
 
-func NewSubscriptionPerks(
+func NewPerkInferer(
 	basic perks,
 	premium perks,
 	deviation time.Duration,
-) SubscriptionPerk {
-	return SubscriptionPerk{basic, premium, deviation}
+) PerkInferer {
+	return PerkInferer{basic, premium, deviation}
 }
 
-func (l SubscriptionPerk) Infer(subscription domain.Subscription) (time.Duration, uint) {
+func (l PerkInferer) Infer(subscription subscription.Subscription) (time.Duration, uint) {
 	expiration := subscription.ExpiredAt()
 	diff := expiration.Sub(time.Now()) - l.deviation
 	if diff <= 0 {
