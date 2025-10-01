@@ -162,18 +162,16 @@ func (s Shortening) ListenFinishShortening(msg []byte) error {
 			s.finishShortening.Version, payload.Meta.Version)
 	}
 
-	switch payload.Meta.Source {
+	switch payload.Data.Usecase {
 	case shorteningMsg.LinkShortenedName:
 		err = s.service.HandleLinkShortened(
-			payload.Data.Id,
-			payload.Data.UserId,
+			payload.Data.ContextId,
 			payload.Data.Perk.Lifetime,
 			payload.Data.Perk.Limit)
 	case shorteningMsg.ShortConfiguredName:
 		err = s.service.HandleShortConfigured(
-			payload.Data.Id,
-			payload.Data.UserId,
-			payload.Data.Perk.AllowEdit)
+			payload.Data.ContextId,
+			payload.Data.Perk.AllowShortEdit)
 	}
 	if err != nil {
 		return fmt.Errorf("controller<Shortening.ListenFinishShortening>: %w", err)

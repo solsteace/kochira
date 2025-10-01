@@ -7,12 +7,13 @@ import (
 )
 
 type finishShorteningData struct {
-	Id     uint64 `json:"id"`
-	UserId uint64 `json:"userId"`
-	Perk   struct {
-		Limit     uint          `json:"limit"`
-		Lifetime  time.Duration `json:"lifetime"`
-		AllowEdit bool          `json:"allowEdit"`
+	Id        uint64 `json:"id"`        // What is the id of the message?
+	ContextId uint64 `json:"contextId"` // What is the id of the message's context?
+	Usecase   string `json:"usecase"`   // What is the purpose of the check?
+	Perk      struct {
+		Limit          uint          `json:"limit"`          // How many simultaneous-active-links a user could make at a time?
+		Lifetime       time.Duration `json:"lifetime"`       // How long a link would last since its shortening?
+		AllowShortEdit bool          `json:"allowShortEdit"` // Does the user allowed to edit the shortened link?
 	} `json:"perk"`
 }
 

@@ -9,8 +9,9 @@ import (
 )
 
 type checkSubscriptionData struct {
-	Id     uint64 `json:"id"`
-	UserId uint64 `json:"userId"`
+	Id      uint64 `json:"id"`
+	UserId  uint64 `json:"userId"`
+	Usecase string `json:"usecase"`
 }
 
 // Handles integration event for commanding subscription check
@@ -28,11 +29,11 @@ func (csm CheckSubscriptionMessenger) FromLinkShortened(
 	}{
 		Meta: meta{
 			Version:  csm.Version,
-			Source:   shorteningMsg.LinkShortenedName,
 			IssuedAt: time.Now()},
 		Data: checkSubscriptionData{
-			Id:     msg.Id(),
-			UserId: msg.UserId()}}
+			Id:      msg.Id(),
+			UserId:  msg.UserId(),
+			Usecase: shorteningMsg.LinkShortenedName}}
 
 	marshalledPayload, err := json.Marshal(payload)
 	if err != nil {
@@ -52,11 +53,11 @@ func (csm CheckSubscriptionMessenger) FromShortConfigured(
 	}{
 		Meta: meta{
 			Version:  csm.Version,
-			Source:   shorteningMsg.ShortConfiguredName,
 			IssuedAt: time.Now()},
 		Data: checkSubscriptionData{
-			Id:     msg.Id(),
-			UserId: msg.UserId()}}
+			Id:      msg.Id(),
+			UserId:  msg.UserId(),
+			Usecase: shorteningMsg.ShortConfiguredName}}
 
 	marshalledPayload, err := json.Marshal(payload)
 	if err != nil {

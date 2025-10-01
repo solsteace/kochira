@@ -206,7 +206,6 @@ func (s Shortening) PublishShortConfigured(
 // - row locking. Challenge: May need to inject business logic between database queries
 func (s Shortening) HandleLinkShortened(
 	msgId uint64,
-	userId uint64,
 	lifetime time.Duration,
 	linkCountLimit uint,
 ) error {
@@ -218,10 +217,10 @@ func (s Shortening) HandleLinkShortened(
 	oldLink, err := s.store.GetById(msgCtx.LinkId())
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
-	} else if !oldLink.AccessibleBy(userId) {
+	} else if !oldLink.AccessibleBy(msgCtx.UserId()) {
 		err := oops.Forbidden{
 			Err: errors.New("You don't have access to this link")}
-		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
+		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
 	}
 
 	// Skip the-not-new-links. By logic, these links would always
@@ -231,7 +230,7 @@ func (s Shortening) HandleLinkShortened(
 		return nil
 	}
 
-	stats, err := s.store.CountByUserIdExcept(userId, msgCtx.LinkId())
+	stats, err := s.store.CountByUserIdExcept(msgCtx.UserId(), msgCtx.LinkId())
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
 	} else if !stats.HasQuota(linkCountLimit, 1) {
@@ -283,7 +282,6 @@ func (s Shortening) HandleLinkShortened(
 // - row locking. Challenge: May need to inject business logic between database queries
 func (s Shortening) HandleShortConfigured(
 	msgId uint64,
-	userId uint64,
 	allowEditShortUrl bool,
 ) error {
 	msgCtx, err := s.store.GetShortConfiguredById(msgId)
@@ -294,7 +292,7 @@ func (s Shortening) HandleShortConfigured(
 	oldLink, err := s.store.GetById(msgCtx.LinkId())
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
-	} else if !oldLink.AccessibleBy(userId) {
+	} else if !oldLink.AccessibleBy(msgCtx.UserId()) {
 		err := oops.Forbidden{
 			Err: errors.New("You don't have access to this link")}
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)

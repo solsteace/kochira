@@ -13,5 +13,8 @@ func (ls LinkShortened) UserId() uint64 { return ls.userId }
 func (ls LinkShortened) LinkId() uint64 { return ls.linkId }
 
 func NewLinkShortened(id, userId, linkId uint64) LinkShortened {
-	return LinkShortened{id, userId, linkId}
+	return LinkShortened{
+		id:     id,
+		userId: userId,
+		linkId: linkId}
 }
