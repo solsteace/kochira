@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/solsteace/kochira/subscription/internal/controller"
+	"github.com/solsteace/kochira/subscription/internal/messaging"
 	"github.com/solsteace/kochira/subscription/internal/middleware"
 	"github.com/solsteace/kochira/subscription/internal/persistence"
 	"github.com/solsteace/kochira/subscription/internal/route"
@@ -20,6 +21,7 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	subscriptionService "github.com/solsteace/kochira/subscription/internal/domain/subscription/service"
+	"github.com/solsteace/kochira/subscription/internal/domain/subscription/value"
 )
 
 const moduleName = "kochira/subscription"
@@ -78,15 +80,22 @@ func RunApp() {
 	// ================================
 	// Layers
 	// ================================
+
+	createSubscription := messaging.CreateSubscriptionMessenger{Version: 1}
+	checkSubscription := messaging.CheckSubscriptionMessenger{Version: 1}
+	finishShortening := messaging.FinishShorteningMessenger{Version: 1}
 	userContext := middleware.NewUserContext("X-User-Id")
 	perkHandler := subscriptionService.NewPerkInferer(
-		subscriptionService.NewPerks(time.Hour*24*3, 10),
-		subscriptionService.NewPerks(time.Hour*24*30*12, 500),
+		value.NewPerks(time.Hour*24*3, 10, false),
+		value.NewPerks(time.Hour*24*30*12, 500, true),
 		time.Second*5)
 
 	subscriptionRepo := persistence.NewPgSubscription(dbClient)
-	subscriptionService := service.NewSubscription(subscriptionRepo, perkHandler)
-	subscriptionController := controller.NewSubscription(subscriptionService, 1)
+	subscriptionService := service.NewSubscription(subscriptionRepo, perkHandler, &mq)
+	subscriptionController := controller.NewSubscription(
+		subscriptionService,
+		createSubscription,
+		checkSubscription)
 
 	// ================================
 	// Routes
@@ -104,11 +113,32 @@ func RunApp() {
 	// ========================================
 	// Side effects & subscriptions
 	// ========================================
+	publishers := []publisher{
+		publisher{
+			interval: time.Second * 2,
+			callback: func() error {
+				return subscriptionService.PublishFinishShortening(
+					20, finishShortening.FromSubscriptionChecked)
+			},
+		}}
+	for _, p := range publishers {
+		go func() {
+			t := time.NewTicker(p.interval)
+			for range t.C {
+				if err := p.callback(); err != nil {
+					log.Printf("internal<RunApp>: %v\n", err)
+				}
+			}
+		}()
+	}
 
 	listeners := []listener{
 		listener{
-			subscriptionController.InitSubscription,
-			service.CreateSubcriptionQueue}}
+			subscriptionController.ListenCreateSubscription,
+			service.CreateSubcriptionQueue},
+		listener{
+			subscriptionController.ListenCheckSubscription,
+			service.CheckSubscriptionQueue}}
 	for _, l := range listeners {
 		opts := utility.NewDefaultAmqpConsumeOpts(l.queue, false)
 		if err := mq.AddConsumer("default", l.callback, opts); err != nil {

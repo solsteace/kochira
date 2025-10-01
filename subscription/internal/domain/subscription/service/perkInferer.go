@@ -4,23 +4,12 @@ import (
 	"time"
 
 	"github.com/solsteace/kochira/subscription/internal/domain/subscription"
+	"github.com/solsteace/kochira/subscription/internal/domain/subscription/value"
 )
 
-type perks struct {
-	expiration time.Duration
-	linkLimit  uint
-}
-
-func NewPerks(
-	expiration time.Duration,
-	linkLimit uint,
-) perks {
-	return perks{expiration, linkLimit}
-}
-
 type PerkInferer struct {
-	basic   perks
-	premium perks
+	basic   value.Perk
+	premium value.Perk
 
 	// How early subscriptions considered as expired from actual expiration time.
 	// It prevents premium perks being used just before or even during the
@@ -29,18 +18,17 @@ type PerkInferer struct {
 }
 
 func NewPerkInferer(
-	basic perks,
-	premium perks,
+	basic value.Perk,
+	premium value.Perk,
 	deviation time.Duration,
 ) PerkInferer {
 	return PerkInferer{basic, premium, deviation}
 }
 
-func (l PerkInferer) Infer(subscription subscription.Subscription) (time.Duration, uint) {
+func (l PerkInferer) Infer(subscription subscription.Subscription) value.Perk {
 	expiration := subscription.ExpiredAt()
-	diff := expiration.Sub(time.Now()) - l.deviation
-	if diff <= 0 {
-		return l.premium.expiration, l.premium.linkLimit
+	if diff := expiration.Sub(time.Now()) - l.deviation; diff > 0 {
+		return l.premium
 	}
-	return l.basic.expiration, l.basic.linkLimit
+	return l.basic
 }
