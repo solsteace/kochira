@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -73,9 +72,9 @@ func (s Shortening) UpdateById(
 	case err != nil:
 		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
 	case !oldLink.AccessibleBy(userId):
-		err := oops.Forbidden{
-			Err: errors.New("You don't have access to this link")}
-		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
+		return fmt.Errorf(
+			"service<Shortening.DeleteById>: %w",
+			oops.Forbidden{Msg: "You don't have access to this link"})
 	}
 
 	requirePremiumSubscription := oldLink.ShortChanged(shortened)
@@ -120,9 +119,9 @@ func (s Shortening) DeleteById(userId, id uint64) error {
 		return fmt.Errorf("service<Shortening.DeleteById>: %w", err)
 	}
 	if !link.AccessibleBy(userId) {
-		err := oops.Forbidden{
-			Err: errors.New("You don't have access to this link")}
-		return fmt.Errorf("service<Shortening.DeleteById>: %w", err)
+		return fmt.Errorf(
+			"service<Shortening.DeleteById>: %w",
+			oops.Forbidden{Msg: "You don't have access to this link"})
 	}
 
 	if err := s.store.DeleteById(id); err != nil {
@@ -235,9 +234,11 @@ func (s Shortening) HandleLinkShortened(
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
 	} else if !oldLink.AccessibleBy(msgCtx.UserId()) {
-		err := oops.Forbidden{
-			Err: errors.New("You don't have access to this link")}
-		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
+		return fmt.Errorf(
+			"service<Shortening.HandleLinkShortened>: %w",
+			oops.Forbidden{Msg: fmt.Sprintf(
+				"User(id:%d) doesn't have access to Link(id:%d)",
+				msgCtx.UserId(), msgCtx.LinkId())})
 	}
 
 	// Skip the-not-new-links. By logic, these links would always
@@ -251,8 +252,11 @@ func (s Shortening) HandleLinkShortened(
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
 	} else if !stats.HasQuota(linkCountLimit, 1) {
-		err := errors.New("Quota for simultaneous active shortened links had ran out")
-		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
+		return fmt.Errorf(
+			"service<Shortening.HandleLinkShortened>: %w",
+			oops.Forbidden{Msg: fmt.Sprintf(
+				"Quota for simultaneous active shortened links had ran out (limit: %d; have: %d)",
+				linkCountLimit, stats.ActiveLinks())})
 	}
 
 	now := time.Now()
@@ -310,13 +314,15 @@ func (s Shortening) HandleShortConfigured(
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
 	} else if !oldLink.AccessibleBy(msgCtx.UserId()) {
-		err := oops.Forbidden{Msg: "You don't have access to this link"}
-		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
+		return fmt.Errorf(
+			"service<Shortening.HandleShortConfigured>: %w",
+			oops.Forbidden{Msg: "You don't have access to this link"})
 	}
 
 	if oldLink.ShortChanged(msgCtx.Shortened()) && !allowEditShortUrl {
-		err := oops.Forbidden{Msg: "Your subscription doesn't allow short editing"}
-		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
+		return fmt.Errorf(
+			"service<Shortening.HandleShortConfigured>: %w",
+			oops.Forbidden{Msg: "Your subscription doesn't allow short editing"})
 	}
 
 	linkId := oldLink.Id()
@@ -335,7 +341,6 @@ func (s Shortening) HandleShortConfigured(
 	if err := s.store.Update(newLink); err != nil {
 		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
 	}
-	fmt.Println("ok")
 	return nil
 }
 
