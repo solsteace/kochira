@@ -75,9 +75,9 @@ func (s Subscription) ListenCheckSubscription(msg []byte) error {
 			s.createSubscription.Version, payload.Meta.Version)
 	}
 
-	err = s.service.CheckSubscription(
+	err = s.service.Check(
 		payload.Data.UserId,
-		payload.Data.Id,
+		payload.Data.CtxId,
 		payload.Data.Usecase)
 	if err != nil {
 		return fmt.Errorf("controller<Subscription.ListenCheckSubscription>: %w", err)

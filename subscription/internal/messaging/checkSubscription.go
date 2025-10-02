@@ -6,9 +6,9 @@ import (
 )
 
 type checkSubscriptionData struct {
-	Id      uint64 `json:"id"`      // What is the id of the message?
-	UserId  uint64 `json:"userId"`  // Whose subscription to check?
-	Usecase string `json:"usecase"` // What is the purpose of the check?
+	CtxId   uint64 `json:"contextId"` // What is the context id of the message?
+	UserId  uint64 `json:"userId"`    // Whose subscription to check?
+	Usecase string `json:"usecase"`   // What is the purpose of the check?
 }
 
 type checkSubscriptionPayload struct {

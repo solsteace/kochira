@@ -69,20 +69,20 @@ func (s Subscription) Init(userId []uint64) error {
 	return nil
 }
 
-func (p Subscription) CheckSubscription(
+func (p Subscription) Check(
 	userId uint64,
 	contextId uint64,
 	usecase string,
 ) error {
 	subscription, err := p.store.GetByOwner(userId)
 	if err != nil {
-		return fmt.Errorf("service<Subscription.Infer>: %w", err)
+		return fmt.Errorf("service<Subscription.Check>: %w", err)
 	}
 
 	perk := p.perkInferer.Infer(subscription)
 	err = p.store.CreateSubscriptionChecked(contextId, usecase, perk)
 	if err != nil {
-		return fmt.Errorf("service<Subscription.Infer>: %w", err)
+		return fmt.Errorf("service<Subscription.Check>: %w", err)
 	}
 	return nil
 }
