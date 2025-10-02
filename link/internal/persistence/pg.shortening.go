@@ -192,16 +192,24 @@ func (repo pg) Configure(l shortening.Link) error {
 	row := newPgLink(l)
 	query := `
 		UPDATE "links"
-		SET is_open = false,
+		SET is_open = false
 		WHERE id = :id`
 	if _, err := tx.NamedExec(query, row); err != nil {
 		return fmt.Errorf("persistence<pg.Configure>: %w", err)
 	}
 
 	outboxQuery := `
-		INSERT INTO short_configured_outbox(user_id, link_id) 
-		VALUES ($1, $2)`
-	outboxArgs := []any{row.UserId, row.Id}
+		INSERT INTO short_configured_outbox(
+			user_id, 
+			link_id, 
+			destination, 
+			shortened) 
+		VALUES ($1, $2, $3, $4)`
+	outboxArgs := []any{
+		row.UserId,
+		row.Id,
+		row.Destination,
+		row.Shortened}
 	if _, err := tx.Exec(outboxQuery, outboxArgs...); err != nil {
 		return fmt.Errorf("persistence<pg.Configure>: %w", err)
 	}
@@ -372,10 +380,18 @@ func (repo pg) GetShortConfigured(maxCount uint) ([]messaging.ShortConfigured, e
 }
 
 func (repo pg) GetShortConfiguredById(id uint64) (messaging.ShortConfigured, error) {
-	query := ` SELECT * FROM short_configured_outbox WHERE id =  $1`
+	query := ` 
+		SELECT
+			id,
+			user_id,
+			link_id,
+			destination,
+			shortened
+		FROM short_configured_outbox 
+		WHERE id =  $1`
 	args := []any{id}
 	row := new(pgShortConfigured)
-	if err := repo.db.Get(row, query, args); err != nil {
+	if err := repo.db.Get(row, query, args...); err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			err2 := oops.NotFound{

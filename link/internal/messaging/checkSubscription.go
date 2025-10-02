@@ -9,7 +9,7 @@ import (
 )
 
 type checkSubscriptionData struct {
-	Id      uint64 `json:"id"`
+	CtxId   uint64 `json:"contextId"`
 	UserId  uint64 `json:"userId"`
 	Usecase string `json:"usecase"`
 }
@@ -31,7 +31,7 @@ func (csm CheckSubscriptionMessenger) FromLinkShortened(
 			Version:  csm.Version,
 			IssuedAt: time.Now()},
 		Data: checkSubscriptionData{
-			Id:      msg.Id(),
+			CtxId:   msg.Id(),
 			UserId:  msg.UserId(),
 			Usecase: shorteningMsg.LinkShortenedName}}
 
@@ -55,7 +55,7 @@ func (csm CheckSubscriptionMessenger) FromShortConfigured(
 			Version:  csm.Version,
 			IssuedAt: time.Now()},
 		Data: checkSubscriptionData{
-			Id:      msg.Id(),
+			CtxId:   msg.Id(),
 			UserId:  msg.UserId(),
 			Usecase: shorteningMsg.ShortConfiguredName}}
 

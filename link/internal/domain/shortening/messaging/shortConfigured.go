@@ -24,9 +24,9 @@ func NewShortConfigured(
 	destination string,
 ) ShortConfigured {
 	return ShortConfigured{
-		id,
-		linkId,
-		userId,
-		shortened,
-		destination}
+		id:          id,
+		userId:      userId,
+		linkId:      linkId,
+		shortened:   shortened,
+		destination: destination}
 }

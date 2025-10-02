@@ -78,20 +78,37 @@ func (s Shortening) UpdateById(
 		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
 	}
 
-	newLink, err := shortening.NewLink(
-		&id,
-		userId,
-		oldLink.Shortened(), // Updated after subscription check
-		destination,
-		oldLink.IsOpen(), // Updated after subscription check
-		oldLink.UpdatedAt(),
-		oldLink.ExpiredAt())
-	if err != nil {
-		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
-	}
-
-	if err := s.store.Update(newLink); err != nil {
-		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
+	requirePremiumSubscription := oldLink.ShortChanged(shortened)
+	if requirePremiumSubscription {
+		newLink, err := shortening.NewLink(
+			&id,
+			userId,
+			shortened,
+			destination,
+			oldLink.IsOpen(),
+			oldLink.UpdatedAt(),
+			oldLink.ExpiredAt())
+		if err != nil {
+			return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
+		}
+		if err := s.store.Configure(newLink); err != nil {
+			return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
+		}
+	} else {
+		newLink, err := shortening.NewLink(
+			&id,
+			userId,
+			oldLink.Shortened(),
+			destination,
+			oldLink.IsOpen(),
+			oldLink.UpdatedAt(),
+			oldLink.ExpiredAt())
+		if err != nil {
+			return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
+		}
+		if err := s.store.Update(newLink); err != nil {
+			return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
+		}
 	}
 	return nil
 }
@@ -293,14 +310,12 @@ func (s Shortening) HandleShortConfigured(
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
 	} else if !oldLink.AccessibleBy(msgCtx.UserId()) {
-		err := oops.Forbidden{
-			Err: errors.New("You don't have access to this link")}
+		err := oops.Forbidden{Msg: "You don't have access to this link"}
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
 	}
 
 	if oldLink.ShortChanged(msgCtx.Shortened()) && !allowEditShortUrl {
-		err := oops.Forbidden{
-			Err: errors.New("Your subscription doesn't allow short editing")}
+		err := oops.Forbidden{Msg: "Your subscription doesn't allow short editing"}
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
 	}
 
@@ -320,6 +335,7 @@ func (s Shortening) HandleShortConfigured(
 	if err := s.store.Update(newLink); err != nil {
 		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
 	}
+	fmt.Println("ok")
 	return nil
 }
 
