@@ -38,7 +38,7 @@ func (csm CheckSubscriptionMessenger) FromLinkShortened(
 	marshalledPayload, err := json.Marshal(payload)
 	if err != nil {
 		return []byte{}, fmt.Errorf(
-			"messaging<CheckSubscriptionMessenger.SerLinkShortened>: %w", err)
+			"messaging<CheckSubscriptionMessenger.FromLinkShortened>: %w", err)
 	}
 	return marshalledPayload, nil
 }
@@ -62,7 +62,7 @@ func (csm CheckSubscriptionMessenger) FromShortConfigured(
 	marshalledPayload, err := json.Marshal(payload)
 	if err != nil {
 		return []byte{}, fmt.Errorf(
-			"messaging<CheckSubscriptionMessenger.SerShortConfigured>: %w", err)
+			"messaging<CheckSubscriptionMessenger.FromShortConfigured>: %w", err)
 	}
 	return marshalledPayload, nil
 }

@@ -30,7 +30,7 @@ func (fsm FinishShorteningMessenger) FromMsg(msg []byte) (*finishShorteningPaylo
 	payload := new(finishShorteningPayload)
 	if err := json.Unmarshal(msg, &payload); err != nil {
 		return nil, fmt.Errorf(
-			"messaging<finishShorteningMessenger.DeFinishShortening>: %w", err)
+			"messaging<finishShorteningMessenger.FromMsg>: %w", err)
 	}
 	return payload, nil
 }

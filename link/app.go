@@ -49,8 +49,7 @@ func RunApp() {
 
 	<-mqInitReady
 	if err := mq.AddChannel("default"); err != nil {
-		err2 := fmt.Errorf("account<RunApp>: channel init: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
+		log.Fatalf("%s: channel init: %v", moduleName, err)
 	}
 	queues := map[string][]string{
 		"default": []string{
@@ -60,8 +59,7 @@ func RunApp() {
 		for _, q := range queue {
 			err := mq.AddQueue(c, utility.NewDefaultAmqpQueueOpts(q))
 			if err != nil {
-				err2 := fmt.Errorf("account<RunApp>: queue init: %w", err)
-				log.Fatalf("%s: %v", moduleName, err2)
+				log.Fatalf("%s: queue init: %v", moduleName, err)
 			}
 		}
 	}
@@ -115,7 +113,7 @@ func RunApp() {
 			t := time.NewTicker(p.interval)
 			for range t.C {
 				if err := p.callback(); err != nil {
-					log.Printf("internal<RunApp>: %v\n", err)
+					log.Fatalf("%s: publisher callback: %v", moduleName, err)
 				}
 			}
 		}()
@@ -129,7 +127,7 @@ func RunApp() {
 	for _, l := range listeners {
 		opts := utility.NewDefaultAmqpConsumeOpts(l.queue, false)
 		if err := mq.AddConsumer("default", l.callback, opts); err != nil {
-			log.Fatalf("internal<RunApp>: failed to setup listener: %v", err)
+			log.Fatalf("%s: listener setup: %v", moduleName, err)
 		}
 	}
 

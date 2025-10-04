@@ -13,10 +13,10 @@ type Redirect struct {
 	service service.Redirect
 }
 
-func (l Redirect) Go(w http.ResponseWriter, r *http.Request) error {
+func (rc Redirect) Go(w http.ResponseWriter, r *http.Request) error {
 	reqId := chiMiddleware.GetReqID(r.Context())
 	shortened := chi.URLParam(r, "shortened")
-	destination, err := l.service.Go(shortened)
+	destination, err := rc.service.Go(shortened)
 	if err != nil {
 		return fmt.Errorf("[%s] controller<Redirection.Go>: %w", reqId, err)
 	}

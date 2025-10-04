@@ -149,27 +149,27 @@ func (lr Shortening) DeleteById(w http.ResponseWriter, r *http.Request) error {
 // Event handling
 // ===============================
 
-func (s Shortening) ListenFinishShortening(msg []byte) error {
-	payload, err := s.finishShortening.FromMsg(msg)
+func (sc Shortening) ListenFinishShortening(msg []byte) error {
+	payload, err := sc.finishShortening.FromMsg(msg)
 	if err != nil {
 		return fmt.Errorf("controller<Shortening.ListenFinishShortening>: %w", err)
 	}
 
-	if s.finishShortening.Version != payload.Meta.Version {
+	if sc.finishShortening.Version != payload.Meta.Version {
 		return fmt.Errorf(
 			"controller<Shortening.ListenFinishShortening>: "+
 				"incompatible version between messenger(v:%d) and message(v:%d)",
-			s.finishShortening.Version, payload.Meta.Version)
+			sc.finishShortening.Version, payload.Meta.Version)
 	}
 
 	switch payload.Data.Usecase {
 	case shorteningMsg.LinkShortenedName:
-		err = s.service.HandleLinkShortened(
+		err = sc.service.HandleLinkShortened(
 			payload.Data.ContextId,
 			payload.Data.Perk.Lifetime,
 			payload.Data.Perk.Limit)
 	case shorteningMsg.ShortConfiguredName:
-		err = s.service.HandleShortConfigured(
+		err = sc.service.HandleShortConfigured(
 			payload.Data.ContextId,
 			payload.Data.Perk.AllowShortEdit)
 	}

@@ -1,7 +1,6 @@
 package redirect
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -19,15 +18,13 @@ type Link struct {
 func (l Link) Access() (string, error) {
 	switch {
 	case !l.IsOpen:
-		err := oops.Forbidden{
-			Err: errors.New("This link is not opened by the owner"),
-			Msg: "This link is not opened by the owner"}
-		return "", fmt.Errorf("service<Redirect.Go>: %w", err)
+		return "", fmt.Errorf(
+			"service<Redirect.Go>: %w",
+			oops.Forbidden{Msg: "This link is not opened by the owner"})
 	case time.Now().Sub(l.ExpiredAt) > 0:
-		err := oops.Forbidden{
-			Err: errors.New("This link had already expired"),
-			Msg: "This link had already expired"}
-		return "", fmt.Errorf("service<Redirect.Go>: %w", err)
+		return "", fmt.Errorf(
+			"service<Redirect.Go>: %w",
+			oops.Forbidden{Msg: "This link had already expired"})
 	}
 	return l.Destination, nil
 }

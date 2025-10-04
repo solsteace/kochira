@@ -202,7 +202,7 @@ func (repo pg) UpdateWithSubscription(l shortening.Link) error {
 			:alias,
 			:is_open)`
 	if _, err := repo.db.NamedExec(query, row); err != nil {
-		return fmt.Errorf("persistence<pg.Configure>: %w", err)
+		return fmt.Errorf("persistence<pg.UpdateWithSubscription>: %w", err)
 	}
 	return nil
 }
@@ -222,7 +222,6 @@ func (repo pg) Update(l shortening.Link) error {
 	if _, err := repo.db.NamedExec(query, row); err != nil {
 		return fmt.Errorf("persistence<pg.Update>: %w", err)
 	}
-
 	return nil
 }
 

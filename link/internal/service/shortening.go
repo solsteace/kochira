@@ -289,16 +289,16 @@ func (s Shortening) HandleLinkShortened(
 // - optimistic locking (via updatedAt). Challenge: Requires retry mechanism whenever needed
 //
 // - row locking. Challenge: May need to inject business logic between database queries
-func (s Shortening) HandleShortConfigured(
+func (ss Shortening) HandleShortConfigured(
 	msgId uint64,
 	allowEditShortUrl bool,
 ) error {
-	msgCtx, err := s.store.GetShortConfiguredById(msgId)
+	msgCtx, err := ss.store.GetShortConfiguredById(msgId)
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
 	}
 
-	oldLink, err := s.store.GetById(msgCtx.LinkId())
+	oldLink, err := ss.store.GetById(msgCtx.LinkId())
 	if err != nil {
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
 	} else if !oldLink.AccessibleBy(msgCtx.UserId()) {
@@ -327,7 +327,7 @@ func (s Shortening) HandleShortConfigured(
 		return fmt.Errorf("service<Shortening.HandleShortConfigured>: %w", err)
 	}
 
-	if err := s.store.Update(newLink); err != nil {
+	if err := ss.store.Update(newLink); err != nil {
 		return fmt.Errorf("service<Shortening.HandleLinkShortened>: %w", err)
 	}
 	return nil

@@ -26,10 +26,11 @@ func (repo pg) GetByAlias(alias string) (redirect.Link, error) {
 		l := redirect.Link{}
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			err2 := oops.NotFound{
-				Err: err,
-				Msg: fmt.Sprintf("link(shortened:%s) not found", alias)}
-			return l, fmt.Errorf("persistence<pgLink.GetByAlias>: %w", err2)
+			return l, fmt.Errorf(
+				"persistence<pgLink.GetByAlias>: %w",
+				oops.NotFound{
+					Err: err,
+					Msg: fmt.Sprintf("link(shortened:%s) not found", alias)})
 		default:
 			return l, fmt.Errorf("persistence<pgLink.GetByAlias>: %w", err)
 		}
