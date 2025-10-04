@@ -95,9 +95,9 @@ func (lr Shortening) Create(w http.ResponseWriter, r *http.Request) error {
 func (lr Shortening) UpdateById(w http.ResponseWriter, r *http.Request) error {
 	reqId := chiMiddleware.GetReqID(r.Context())
 	reqPayload := new(struct {
-		Shortened   string `json:"shortened"`
+		Alias       string `json:"alias"`
 		Destination string `json:"destination"`
-		IsOpen      bool   `json:"is_open"`
+		IsOpen      bool   `json:"isOpen"`
 	})
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(reqPayload); err != nil {
@@ -114,7 +114,7 @@ func (lr Shortening) UpdateById(w http.ResponseWriter, r *http.Request) error {
 	err = lr.service.UpdateById(
 		uint64(userId),
 		id,
-		reqPayload.Shortened,
+		reqPayload.Alias,
 		reqPayload.Destination,
 		reqPayload.IsOpen)
 	if err != nil {

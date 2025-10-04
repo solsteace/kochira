@@ -18,20 +18,20 @@ func (row pgLink) toRedirect() redirect.Link {
 		ExpiredAt:   row.ExpiredAt}
 }
 
-func (repo pg) GetByShortened(shortened string) (redirect.Link, error) {
+func (repo pg) GetByAlias(alias string) (redirect.Link, error) {
 	row := new(pgLink)
-	query := `SELECT * FROM "links" WHERE shortened = $1 LIMIT 1`
-	args := []any{shortened}
+	query := `SELECT * FROM "links" WHERE alias = $1 LIMIT 1`
+	args := []any{alias}
 	if err := repo.db.Get(row, query, args...); err != nil {
 		l := redirect.Link{}
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			err2 := oops.NotFound{
 				Err: err,
-				Msg: fmt.Sprintf("link(shortened:%d) not found", shortened)}
-			return l, fmt.Errorf("persistence<pgLink.GetByShortened>: %w", err2)
+				Msg: fmt.Sprintf("link(shortened:%s) not found", alias)}
+			return l, fmt.Errorf("persistence<pgLink.GetByAlias>: %w", err2)
 		default:
-			return l, fmt.Errorf("persistence<pgLink.GetByShortened>: %w", err)
+			return l, fmt.Errorf("persistence<pgLink.GetByAlias>: %w", err)
 		}
 	}
 

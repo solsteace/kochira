@@ -29,6 +29,5 @@ func (l Link) Access() (string, error) {
 			Msg: "This link had already expired"}
 		return "", fmt.Errorf("service<Redirect.Go>: %w", err)
 	}
-	return l.Shortened, nil
-
+	return l.Destination, nil
 }

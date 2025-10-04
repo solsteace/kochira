@@ -45,8 +45,9 @@ func (s Shortening) Create(userId uint64, destination string) error {
 		nil,
 		userId,
 		"",
+		"",
 		destination,
-		true,
+		false,
 		now,
 		now)
 	if err != nil {
@@ -63,51 +64,40 @@ func (s Shortening) Create(userId uint64, destination string) error {
 func (s Shortening) UpdateById(
 	userId uint64,
 	id uint64,
-	shortened string,
+	alias string,
 	destination string,
-	IsOpen bool,
+	isOpen bool,
 ) error {
 	oldLink, err := s.store.GetById(id)
-	switch {
-	case err != nil:
+	if err != nil {
 		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
-	case !oldLink.AccessibleBy(userId):
+	} else if !oldLink.AccessibleBy(userId) {
 		return fmt.Errorf(
 			"service<Shortening.DeleteById>: %w",
 			oops.Forbidden{Msg: "You don't have access to this link"})
 	}
 
-	requirePremiumSubscription := oldLink.ShortChanged(shortened)
+	requirePremiumSubscription := oldLink.AliasedWith(alias)
+	newLink, err := shortening.NewLink(
+		&id,
+		userId,
+		oldLink.Shortened(),
+		alias,
+		destination,
+		isOpen,
+		oldLink.UpdatedAt(),
+		oldLink.ExpiredAt())
+	if err != nil {
+		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
+	}
+
 	if requirePremiumSubscription {
-		newLink, err := shortening.NewLink(
-			&id,
-			userId,
-			shortened,
-			destination,
-			oldLink.IsOpen(),
-			oldLink.UpdatedAt(),
-			oldLink.ExpiredAt())
-		if err != nil {
-			return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
-		}
-		if err := s.store.Configure(newLink); err != nil {
-			return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
-		}
+		err = s.store.UpdateWithSubscription(newLink)
 	} else {
-		newLink, err := shortening.NewLink(
-			&id,
-			userId,
-			oldLink.Shortened(),
-			destination,
-			oldLink.IsOpen(),
-			oldLink.UpdatedAt(),
-			oldLink.ExpiredAt())
-		if err != nil {
-			return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
-		}
-		if err := s.store.Update(newLink); err != nil {
-			return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
-		}
+		err = s.store.Update(newLink)
+	}
+	if err != nil {
+		return fmt.Errorf("service<Shortening.UpdateById>: %w", err)
 	}
 	return nil
 }
@@ -117,8 +107,7 @@ func (s Shortening) DeleteById(userId, id uint64) error {
 	link, err := s.store.GetById(id)
 	if err != nil {
 		return fmt.Errorf("service<Shortening.DeleteById>: %w", err)
-	}
-	if !link.AccessibleBy(userId) {
+	} else if !link.AccessibleBy(userId) {
 		return fmt.Errorf(
 			"service<Shortening.DeleteById>: %w",
 			oops.Forbidden{Msg: "You don't have access to this link"})
@@ -141,8 +130,7 @@ func (s Shortening) PublishLinkShortened(
 	msg, err := s.store.GetLinkShortened(maxMsg)
 	if err != nil {
 		return fmt.Errorf("service<Shortening.PublishLinkShortened>: %w", err)
-	}
-	if len(msg) == 0 {
+	} else if len(msg) == 0 {
 		return nil
 	}
 
@@ -174,8 +162,7 @@ func (s Shortening) PublishShortConfigured(
 	msg, err := s.store.GetShortConfigured(maxMsg)
 	if err != nil {
 		return fmt.Errorf("service<Shortening.PublishShortConfigured>: %w", err)
-	}
-	if len(msg) == 0 {
+	} else if len(msg) == 0 {
 		return nil
 	}
 
@@ -265,6 +252,7 @@ func (s Shortening) HandleLinkShortened(
 		&oldLinkId,
 		oldLink.UserId(),
 		oldLink.Shortened(),
+		oldLink.Alias(),
 		oldLink.Destination(),
 		true,
 		now,
@@ -319,7 +307,7 @@ func (s Shortening) HandleShortConfigured(
 			oops.Forbidden{Msg: "You don't have access to this link"})
 	}
 
-	if oldLink.ShortChanged(msgCtx.Shortened()) && !allowEditShortUrl {
+	if oldLink.AliasedWith(msgCtx.Alias()) && !allowEditShortUrl {
 		return fmt.Errorf(
 			"service<Shortening.HandleShortConfigured>: %w",
 			oops.Forbidden{Msg: "Your subscription doesn't allow short editing"})
@@ -329,9 +317,10 @@ func (s Shortening) HandleShortConfigured(
 	newLink, err := shortening.NewLink(
 		&linkId,
 		oldLink.UserId(),
-		msgCtx.Shortened(),
+		oldLink.Shortened(),
+		msgCtx.Alias(),
 		msgCtx.Destination(),
-		oldLink.IsOpen(),
+		msgCtx.IsOpen(),
 		time.Now(),
 		oldLink.ExpiredAt())
 	if err != nil {

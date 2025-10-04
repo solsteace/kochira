@@ -12,7 +12,7 @@ type Redirect struct {
 
 // Redirects the user to the destination based on given shortened URI
 func (ls Redirect) Go(shortened string) (string, error) {
-	link, err := ls.store.GetByShortened(shortened)
+	link, err := ls.store.GetByAlias(shortened)
 	if err != nil {
 		return "", fmt.Errorf("service<Redirect.Go>: %w", err)
 	}

@@ -45,6 +45,7 @@ type pgLink struct {
 	Id          uint64    `db:"id"`
 	UserId      uint64    `db:"user_id"`
 	Shortened   string    `db:"shortened"`
+	Alias       string    `db:"alias"`
 	Destination string    `db:"destination"`
 	IsOpen      bool      `db:"is_open"`
 	UpdatedAt   time.Time `db:"updated_at"`
@@ -56,6 +57,7 @@ func (row pgLink) toShortening() (shortening.Link, error) {
 		&row.Id,
 		row.UserId,
 		row.Shortened,
+		row.Alias,
 		row.Destination,
 		row.IsOpen,
 		row.UpdatedAt,
@@ -67,6 +69,7 @@ func newPgLink(l shortening.Link) pgLink {
 		Id:          l.Id(),
 		UserId:      l.UserId(),
 		Shortened:   l.Shortened(),
+		Alias:       l.Alias(),
 		Destination: l.Destination(),
 		IsOpen:      l.IsOpen(),
 		UpdatedAt:   l.UpdatedAt(),
@@ -147,6 +150,7 @@ func (repo pg) Create(l shortening.Link) error {
 		INSERT INTO "links"(
 			user_id,
 			shortened,
+			alias,
 			destination,
 			is_open,
 			updated_at,
@@ -154,6 +158,7 @@ func (repo pg) Create(l shortening.Link) error {
 		VALUES (
 			:user_id, 
 			:shortened, 
+			:alias,
 			:destination, 
 			:is_open, 
 			:updated_at, 
@@ -181,40 +186,22 @@ func (repo pg) Create(l shortening.Link) error {
 	return nil
 }
 
-func (repo pg) Configure(l shortening.Link) error {
-	ctx := context.Background()
-	tx, err := repo.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("persistence<pg.Configure>: %w", err)
-	}
-	defer tx.Rollback()
-
+func (repo pg) UpdateWithSubscription(l shortening.Link) error {
 	row := newPgLink(l)
 	query := `
-		UPDATE "links"
-		SET is_open = false
-		WHERE id = :id`
-	if _, err := tx.NamedExec(query, row); err != nil {
-		return fmt.Errorf("persistence<pg.Configure>: %w", err)
-	}
-
-	outboxQuery := `
 		INSERT INTO short_configured_outbox(
-			user_id, 
 			link_id, 
+			user_id, 
 			destination, 
-			shortened) 
-		VALUES ($1, $2, $3, $4)`
-	outboxArgs := []any{
-		row.UserId,
-		row.Id,
-		row.Destination,
-		row.Shortened}
-	if _, err := tx.Exec(outboxQuery, outboxArgs...); err != nil {
-		return fmt.Errorf("persistence<pg.Configure>: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
+			alias,
+			is_open) 
+		VALUES (
+			:id,
+			:user_id, 
+			:destination,
+			:alias,
+			:is_open)`
+	if _, err := repo.db.NamedExec(query, row); err != nil {
 		return fmt.Errorf("persistence<pg.Configure>: %w", err)
 	}
 	return nil
@@ -225,7 +212,7 @@ func (repo pg) Update(l shortening.Link) error {
 	query := `
 		UPDATE "links"
 		SET 
-			shortened = :shortened,
+			alias = :alias,
 			destination = :destination,
 			is_open = :is_open,
 			updated_at = :updated_at,
@@ -342,8 +329,9 @@ type pgShortConfigured struct {
 	Id          uint64 `db:"id"`
 	UserId      uint64 `db:"user_id"`
 	LinkId      uint64 `db:"link_id"`
-	Shortened   string `db:"shortened"`
+	Alias       string `db:"alias"`
 	Destination string `db:"destination"`
+	IsOpen      bool   `db:"is_open"`
 }
 
 func (row pgShortConfigured) toMessage() messaging.ShortConfigured {
@@ -351,8 +339,9 @@ func (row pgShortConfigured) toMessage() messaging.ShortConfigured {
 		row.Id,
 		row.LinkId,
 		row.UserId,
-		row.Shortened,
-		row.Destination)
+		row.Alias,
+		row.Destination,
+		row.IsOpen)
 }
 
 func (repo pg) GetShortConfigured(maxCount uint) ([]messaging.ShortConfigured, error) {
@@ -362,7 +351,8 @@ func (repo pg) GetShortConfigured(maxCount uint) ([]messaging.ShortConfigured, e
 			user_id,
 			link_id,
 			destination,
-			shortened
+			alias,
+			is_open
 		FROM short_configured_outbox 
 		WHERE is_done = false 
 		LIMIT $1`
@@ -386,7 +376,8 @@ func (repo pg) GetShortConfiguredById(id uint64) (messaging.ShortConfigured, err
 			user_id,
 			link_id,
 			destination,
-			shortened
+			alias,
+			is_open
 		FROM short_configured_outbox 
 		WHERE id =  $1`
 	args := []any{id}

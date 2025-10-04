@@ -11,15 +11,16 @@ import (
 )
 
 const (
-	shortened_max_len   = 15
-	shortened_chars     = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	destination_max_len = 255
+	sHORTENED_MAX_LEN   = 15
+	sHORTENED_CHARSET   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	dESTINATION_MAX_LEN = 255
 )
 
 type Link struct {
 	id          uint64
 	userId      uint64
 	shortened   string
+	alias       string
 	destination string
 	isOpen      bool
 	updatedAt   time.Time
@@ -30,10 +31,11 @@ type Link struct {
 func (l *Link) Shorten() {
 	shortened := make([]byte, 15)
 	for i, _ := range shortened {
-		idx := rand.Int() % len(shortened_chars)
-		shortened[i] = shortened_chars[idx]
+		idx := rand.Int() % len(sHORTENED_CHARSET)
+		shortened[i] = sHORTENED_CHARSET[idx]
 	}
 	l.shortened = string(shortened)
+	l.alias = l.shortened
 }
 
 func (l Link) HadExpired() bool {
@@ -42,13 +44,14 @@ func (l Link) HadExpired() bool {
 func (l Link) AccessibleBy(userId uint64) bool {
 	return l.userId == userId
 }
-func (l Link) ShortChanged(short string) bool {
-	return l.shortened != short
+func (l Link) AliasedWith(alias string) bool {
+	return l.shortened != alias
 }
 
 func (l Link) Id() uint64           { return l.id }
 func (l Link) UserId() uint64       { return l.userId }
 func (l Link) Shortened() string    { return l.shortened }
+func (l Link) Alias() string        { return l.alias }
 func (l Link) Destination() string  { return l.destination }
 func (l Link) IsOpen() bool         { return l.isOpen }
 func (l Link) UpdatedAt() time.Time { return l.updatedAt }
@@ -58,6 +61,7 @@ func NewLink(
 	id *uint64,
 	userId uint64,
 	shortened string,
+	alias string,
 	destination string,
 	isOpen bool,
 	updatedAt time.Time,
@@ -68,38 +72,37 @@ func NewLink(
 		actualId = *id
 	}
 
-	switch {
-	case len(shortened) > shortened_max_len:
+	if len(shortened) > sHORTENED_MAX_LEN {
 		err := oops.BadValues{
 			Err: errors.New(fmt.Sprintf(
 				"Shortened could only be %d chars long at maximum",
-				shortened_max_len))}
+				sHORTENED_MAX_LEN))}
 		return Link{}, fmt.Errorf("domain<NewLink>: %w", err)
-	case len(destination) > destination_max_len:
+	} else if len(destination) > dESTINATION_MAX_LEN {
 		err := oops.BadValues{
 			Err: errors.New(fmt.Sprintf(
 				"Destination could only be %d chars long at maximum",
-				destination_max_len))}
+				dESTINATION_MAX_LEN))}
 		return Link{}, fmt.Errorf("domain<NewLink>: %w", err)
 	}
 
 	destinationUrl, err := url.Parse(destination)
 	if err != nil {
 		return Link{}, fmt.Errorf("domain<NewLink>: %w", err)
-	}
-	if destinationUrl.Scheme == "" {
+	} else if destinationUrl.Scheme == "" {
 		err := oops.BadValues{
 			Err: errors.New("destination should contain URL scheme")}
 		return Link{}, fmt.Errorf("domain<NewLink>: %w", err)
 	}
 
 	l := Link{
-		actualId,
-		userId,
-		shortened,
-		destination,
-		isOpen,
-		updatedAt,
-		expiredAt}
+		id:          actualId,
+		userId:      userId,
+		shortened:   shortened,
+		alias:       alias,
+		destination: destination,
+		isOpen:      isOpen,
+		updatedAt:   updatedAt,
+		expiredAt:   expiredAt}
 	return l, nil
 }

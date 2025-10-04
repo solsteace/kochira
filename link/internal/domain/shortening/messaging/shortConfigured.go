@@ -6,15 +6,17 @@ type ShortConfigured struct {
 	id          uint64
 	userId      uint64
 	linkId      uint64
-	shortened   string
+	alias       string
 	destination string
+	isOpen      bool
 }
 
 func (sc ShortConfigured) Id() uint64          { return sc.id }
 func (sc ShortConfigured) LinkId() uint64      { return sc.linkId }
 func (sc ShortConfigured) UserId() uint64      { return sc.userId }
-func (sc ShortConfigured) Shortened() string   { return sc.shortened }
+func (sc ShortConfigured) Alias() string       { return sc.alias }
 func (sc ShortConfigured) Destination() string { return sc.destination }
+func (sc ShortConfigured) IsOpen() bool        { return sc.isOpen }
 
 func NewShortConfigured(
 	id uint64,
@@ -22,11 +24,13 @@ func NewShortConfigured(
 	userId uint64,
 	shortened string,
 	destination string,
+	isOpen bool,
 ) ShortConfigured {
 	return ShortConfigured{
 		id:          id,
 		userId:      userId,
 		linkId:      linkId,
-		shortened:   shortened,
-		destination: destination}
+		alias:       shortened,
+		destination: destination,
+		isOpen:      isOpen}
 }

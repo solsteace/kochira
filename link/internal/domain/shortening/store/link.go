@@ -15,10 +15,10 @@ type Link[queryParams any] interface {
 
 	// Commands ===========
 
-	Create(l shortening.Link) error    // Creates Link and emits `linkShortened` message
-	Configure(l shortening.Link) error // Emits `shortConfigured` message
-	Update(l shortening.Link) error    // Updates link
-	DeleteById(id uint64) error        // Deletes link
+	Create(l shortening.Link) error                 // Creates Link and emits `linkShortened` message
+	UpdateWithSubscription(l shortening.Link) error // Emits `shortConfigured` message
+	Update(l shortening.Link) error                 // Updates link
+	DeleteById(id uint64) error                     // Deletes link
 
 	// Events ===========
 
