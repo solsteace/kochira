@@ -12,12 +12,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/solsteace/go-lib/token"
 	"github.com/solsteace/kochira/account/internal/controller"
 	"github.com/solsteace/kochira/account/internal/persistence"
 	"github.com/solsteace/kochira/account/internal/route"
 	"github.com/solsteace/kochira/account/internal/service"
 	"github.com/solsteace/kochira/account/internal/utility"
+	"github.com/solsteace/kochira/account/internal/utility/hash"
+	"github.com/solsteace/kochira/account/internal/utility/token"
 	"github.com/valkey-io/valkey-go"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -56,12 +57,12 @@ func RunApp() {
 	defer cacheClient.Close()
 
 	upSince := time.Now().Unix()
-	secretHandler := utility.NewBcrypt(10)
-	accessTokenHandler := utility.NewJwt[token.Auth](
+	secretHandler := hash.NewBcrypt(10)
+	accessTokenHandler := token.NewJwt[token.Auth](
 		envTokenIssuer,
 		envTokenSecret,
 		time.Duration(envAccessTokenLifetime))
-	refreshTokenHandler := utility.NewJwt[token.Auth](
+	refreshTokenHandler := token.NewJwt[token.Auth](
 		envTokenIssuer,
 		strings.Repeat(envTokenSecret, 2),
 		time.Duration(envRefreshTokenLifetime))

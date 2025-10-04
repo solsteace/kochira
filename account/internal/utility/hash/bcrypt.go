@@ -1,4 +1,4 @@
-package utility
+package hash
 
 import (
 	"errors"
