@@ -7,6 +7,8 @@ Worry not, Kochira will ***show you the way*** to share links!
 
 - [x] URL Shortener
 - [ ] Premium perk subscription (simulation! 😁)
+  - [x] Subscription-aware core feature
+  - [ ] Purchasing/extending
 
 ## Developing 
 This repository uses monorepo approach by relying on `go.work`. If you want to focus developing 
