@@ -113,6 +113,14 @@ func RunApp() {
 	// ========================================
 	// Side effects & subscriptions
 	// ========================================
+
+	// TODO: start in its own process (or machine, if needed)
+	go func() {
+		t := time.NewTicker(5 * time.Second)
+		for range t.C {
+		}
+	}()
+
 	publishers := []publisher{
 		publisher{
 			interval: time.Second * 2,

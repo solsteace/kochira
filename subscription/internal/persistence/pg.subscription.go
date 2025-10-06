@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -30,23 +31,30 @@ func newPgSubscriptionRow(s subscription.Subscription) pgSubscription {
 		ExpiredAt: s.ExpiredAt()}
 }
 
-func (repo pg) CheckManyByOwner(id []uint64) ([]uint64, error) {
-	query, args, err := sqlx.In(`
-		SELECT user_id 
-		FROM subscriptions
-		WHERE user_id IN (?)`, id)
+func (repo pg) FilterExisting(id []uint64) ([]uint64, error) {
+	// Warning: SQL standard, but not universal in the way of adoption
+	idRows := []string{}
+	for _, i := range id {
+		idRows = append(idRows, fmt.Sprintf("(%d)", i))
+	}
+	idToCheck := fmt.Sprintf("VALUES %s", strings.Join(idRows, ","))
+
+	query := fmt.Sprintf(`
+		WITH id_to_check("id") AS (%s)
+		SELECT id FROM id_to_check
+		WHERE id NOT IN (SELECT id FROM subscriptions)`, idToCheck)
+	query, args, err := sqlx.In(query, id)
 	if err != nil {
 		return []uint64{}, fmt.Errorf(
 			"persistence<pg.CheckManyByOwner>: %w", err)
 	}
 
-	foundId := new([]uint64)
-	if err := repo.db.Select(foundId, repo.db.Rebind(query), args...); err != nil {
+	filteredId := new([]uint64)
+	if err := repo.db.Select(filteredId, repo.db.Rebind(query), args...); err != nil {
 		return []uint64{}, fmt.Errorf(
 			"persistence<pg.CheckManyByOwner>: %w", err)
 	}
-
-	return *foundId, nil
+	return *filteredId, nil
 }
 
 func (repo pg) GetByOwner(id uint64) (subscription.Subscription, error) {

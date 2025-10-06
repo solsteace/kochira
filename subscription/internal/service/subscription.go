@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/solsteace/kochira/subscription/internal/domain/subscription"
@@ -42,20 +41,14 @@ func (s Subscription) GetByUserId(id uint64) (subscription.Subscription, error) 
 }
 
 func (s Subscription) Init(userId []uint64) error {
-	existingSubscriptions, err := s.store.CheckManyByOwner(userId)
+	newSubscriptions, err := s.store.FilterExisting(userId)
 	if err != nil {
 		return fmt.Errorf("service<Subscription.Init>: %w", err)
 	}
 
 	now := time.Now()
 	subscriptions := []subscription.Subscription{}
-	for _, uId := range userId {
-		// Number of new users within small time window (say, 2 - 3 seconds) won't
-		// be large enough, so using linear search would be okay for now
-		if slices.Contains(existingSubscriptions, uId) {
-			continue
-		}
-
+	for _, uId := range newSubscriptions {
 		s, err := subscription.NewSubscription(nil, uId, now)
 		if err != nil {
 			return fmt.Errorf("service<Subscription.Init>: %w", err)
@@ -84,6 +77,10 @@ func (p Subscription) Check(
 	if err != nil {
 		return fmt.Errorf("service<Subscription.Check>: %w", err)
 	}
+	return nil
+}
+
+func (p Subscription) Watch() error {
 	return nil
 }
 
