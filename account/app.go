@@ -56,6 +56,10 @@ func RunApp() {
 	}
 	defer cacheClient.Close()
 
+	mq := utility.NewAmqp()
+	mqInitReady := make(chan struct{})
+	go mq.Start(envMqUrl, mqInitReady)
+
 	upSince := time.Now().Unix()
 	hasher := hash.NewBcrypt(10)
 	accessTokenHandler := token.NewJwt[token.Auth](
@@ -109,12 +113,6 @@ func RunApp() {
 	// ========================================
 	// Side effects, susbcriptions
 	// ========================================
-	mq := utility.NewAmqp()
-	mqMonitorEnd := make(chan struct{})
-	mqInitReady := make(chan struct{})
-	go mq.Start(envMqUrl, mqInitReady)
-	go mq.Monitor(mqMonitorEnd)
-
 	<-mqInitReady
 	if err := mq.AddChannel("default"); err != nil {
 		err2 := fmt.Errorf("account<RunApp>: channel init: %w", err)

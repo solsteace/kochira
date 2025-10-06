@@ -11,7 +11,7 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type AmqpConsumeFx = func(body []byte) error
+type amqpConsumeFx = func(body []byte) error
 
 type Amqp struct {
 	connMu *sync.RWMutex
@@ -29,7 +29,7 @@ type Amqp struct {
 	consumerMu *sync.RWMutex
 	consumer   map[string]struct {
 		end  context.CancelFunc
-		fx   AmqpConsumeFx
+		fx   amqpConsumeFx
 		opts amqpConsumeOpts
 	}
 
@@ -166,7 +166,7 @@ func (a *Amqp) AddQueue(channel string, opts amqpQueueOpts) error {
 // NACK-ed
 func (a *Amqp) AddConsumer(
 	channel string,
-	fx AmqpConsumeFx,
+	fx amqpConsumeFx,
 	opts amqpConsumeOpts,
 ) error {
 	a.channelMu.RLock()
@@ -197,7 +197,7 @@ func (a *Amqp) AddConsumer(
 	}
 	a.consumer[opts.queue] = struct {
 		end  context.CancelFunc
-		fx   AmqpConsumeFx
+		fx   amqpConsumeFx
 		opts amqpConsumeOpts
 	}{cancel, fx, opts}
 	a.consumerMu.Unlock()
@@ -273,7 +273,7 @@ func NewAmqp() Amqp {
 		consumerMu: &sync.RWMutex{},
 		consumer: make(map[string]struct {
 			end  context.CancelFunc
-			fx   AmqpConsumeFx
+			fx   amqpConsumeFx
 			opts amqpConsumeOpts
 		}),
 

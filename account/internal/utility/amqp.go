@@ -11,9 +11,9 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type amqpConsumeFx = func(msg amqp091.Delivery) error
+type amqpConsumeFx = func(body []byte) error
 
-type amqp struct {
+type Amqp struct {
 	connMu *sync.RWMutex
 	conn   *amqp091.Connection
 
@@ -40,7 +40,14 @@ type amqp struct {
 // Starts connecting to a node and restores it when went down. `InitReady` channel
 // indicates whether the initial connection has succeeded and would be closed
 // upon succession
-func (a *amqp) Start(url string, initReady chan<- struct{}) {
+func (a *Amqp) Start(url string, initReady chan<- struct{}) {
+	// Monitors connection indefinitely
+	go func() {
+		for err := range a.errChan {
+			fmt.Println(fmt.Errorf("utility<amqp.Start>: monitor: %w", err))
+		}
+	}()
+
 	isFirstConnection := true
 	for backoff := time.Second; ; {
 		if !isFirstConnection {
@@ -57,15 +64,15 @@ func (a *amqp) Start(url string, initReady chan<- struct{}) {
 			continue
 		}
 
-		if isFirstConnection {
-			initReady <- struct{}{}
-			close(initReady)
-		}
-
 		a.connMu.Lock()
 		a.conn = conn
 		a.closeNotifier = a.conn.NotifyClose(make(chan *amqp091.Error))
 		a.connMu.Unlock()
+
+		if isFirstConnection {
+			initReady <- struct{}{}
+			close(initReady)
+		}
 
 		isFirstConnection = false
 		backoff = time.Second
@@ -75,7 +82,7 @@ func (a *amqp) Start(url string, initReady chan<- struct{}) {
 	}
 }
 
-func (a *amqp) restore() error {
+func (a *Amqp) restore() error {
 	var tempChannel string
 	for channel, _ := range a.channel {
 		if err := a.AddChannel(channel); err != nil {
@@ -98,23 +105,9 @@ func (a *amqp) restore() error {
 	return nil
 }
 
-// Starts monitor on activites indefinitely.
-func (a amqp) Monitor(end <-chan struct{}) {
-	go func() {
-		for {
-			select {
-			case err := <-a.errChan:
-				fmt.Println(fmt.Errorf("utility<amqp.Monitor>: %w", err))
-			case <-end:
-				return
-			}
-		}
-	}()
-}
-
 // Registers a channel to be managed. If done multiple times
 // using the same name, the old one would be replaced
-func (a *amqp) AddChannel(name string) error {
+func (a *Amqp) AddChannel(name string) error {
 	a.connMu.RLock()
 	if a.conn == nil {
 		err := errors.New("connection is uninitiated")
@@ -136,7 +129,7 @@ func (a *amqp) AddChannel(name string) error {
 
 // Registers a queue to be managed. If done multiple times using the same name,
 // the old one would be replaced
-func (a *amqp) AddQueue(channel string, opts amqpQueueOpts) error {
+func (a *Amqp) AddQueue(channel string, opts amqpQueueOpts) error {
 	a.channelMu.RLock()
 	c, cOk := a.channel[channel]
 	if !cOk {
@@ -171,7 +164,7 @@ func (a *amqp) AddQueue(channel string, opts amqpQueueOpts) error {
 //
 // The consumer ACKs the message manually. If fx has an error, messages would be
 // NACK-ed
-func (a amqp) AddConsumer(
+func (a *Amqp) AddConsumer(
 	channel string,
 	fx amqpConsumeFx,
 	opts amqpConsumeOpts,
@@ -199,10 +192,10 @@ func (a amqp) AddConsumer(
 	}
 
 	a.consumerMu.Lock()
-	if oldConsumer, ok := a.consumer[channel]; ok {
+	if oldConsumer, ok := a.consumer[opts.queue]; ok {
 		oldConsumer.end()
 	}
-	a.consumer[channel] = struct {
+	a.consumer[opts.queue] = struct {
 		end  context.CancelFunc
 		fx   amqpConsumeFx
 		opts amqpConsumeOpts
@@ -211,7 +204,7 @@ func (a amqp) AddConsumer(
 
 	go func() {
 		for msg := range msgs {
-			err := fx(msg)
+			err := fx(msg.Body)
 			if err != nil {
 				log.Printf("Failed to process message: %v\n", err)
 				if err := msg.Nack(false, opts.requeueNack); err != nil {
@@ -228,7 +221,7 @@ func (a amqp) AddConsumer(
 	return nil
 }
 
-func (a amqp) Publish(channel string, payload []byte, opts amqpPublishOpts) error {
+func (a Amqp) Publish(channel string, payload []byte, opts amqpPublishOpts) error {
 	a.channelMu.RLock()
 	c, cOk := a.channel[channel]
 	if !cOk {
@@ -248,7 +241,7 @@ func (a amqp) Publish(channel string, payload []byte, opts amqpPublishOpts) erro
 }
 
 // Wraps call to Channel.QueueBind
-func (a amqp) QueueBind(channel string, opts amqpQueueBindOpts) error {
+func (a Amqp) QueueBind(channel string, opts amqpQueueBindOpts) error {
 	a.channelMu.RLock()
 	c, cOk := a.channel[channel]
 	if !cOk {
@@ -265,8 +258,8 @@ func (a amqp) QueueBind(channel string, opts amqpQueueBindOpts) error {
 		opts.args)
 }
 
-func NewAmqp() amqp {
-	return amqp{
+func NewAmqp() Amqp {
+	return Amqp{
 		connMu: &sync.RWMutex{},
 
 		queueMu: &sync.RWMutex{},

@@ -32,7 +32,7 @@ type publisher struct {
 }
 
 type listener struct {
-	callback utility.AmqpConsumeFx
+	callback func(msg []byte) error
 	queue    string
 }
 
