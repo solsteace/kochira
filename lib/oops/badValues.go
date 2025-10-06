@@ -1,5 +1,7 @@
 package oops
 
+// An error that indicates certain user-inputted data isn't valid from
+// business rules point of view
 type BadValues struct {
 	// Message to be sent to client
 	Msg string
@@ -10,7 +12,7 @@ type BadValues struct {
 
 func (e BadValues) Error() string {
 	if e.Msg == "" {
-		return "Terdapat data yang tidak sesuai dengan ketentuan"
+		return "A data that doesn't comply with our standards had found"
 	}
 	return e.Msg
 }

@@ -1,5 +1,6 @@
 package oops
 
+// An error equivalent to 404 Not Found HTTP error.
 type NotFound struct {
 	// Message to be sent to client
 	Msg string
@@ -10,7 +11,7 @@ type NotFound struct {
 
 func (e NotFound) Error() string {
 	if e.Msg == "" {
-		return "Data yang dicari tidak ditemukan"
+		return "The data you're looking for wasn't found in our system"
 	}
 	return e.Msg
 }

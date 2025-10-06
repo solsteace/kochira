@@ -1,5 +1,6 @@
 package oops
 
+// An error equivalent to 403 Forbidden HTTP error.
 type Forbidden struct {
 	// Message to be sent to client
 	Msg string
@@ -10,7 +11,7 @@ type Forbidden struct {
 
 func (e Forbidden) Error() string {
 	if e.Msg == "" {
-		return "Anda tidak memiliki izin melakukan aksi ini"
+		return "You don't have the permission to do this action"
 	}
 	return e.Msg
 }
