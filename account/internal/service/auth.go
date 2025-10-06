@@ -7,18 +7,17 @@ import (
 
 	"github.com/solsteace/go-lib/oops"
 
-	"github.com/solsteace/kochira/account/internal/domain/account"
 	"github.com/solsteace/kochira/account/internal/domain/auth"
 	"github.com/solsteace/kochira/account/internal/utility/hash"
 	"github.com/solsteace/kochira/account/internal/utility/token"
 
-	accountStore "github.com/solsteace/kochira/account/internal/domain/account/store"
 	authService "github.com/solsteace/kochira/account/internal/domain/auth/service"
+	authAtore "github.com/solsteace/kochira/account/internal/domain/auth/store"
 	authStore "github.com/solsteace/kochira/account/internal/domain/auth/store"
 )
 
 type Auth struct {
-	userRepo         accountStore.User
+	userStore        authStore.User
 	authAttemptCache authStore.Attempt
 	tokenCache       authStore.Token
 	refreshToken     token.Handler[token.Auth]
@@ -28,43 +27,26 @@ type Auth struct {
 }
 
 func NewAuth(
-	userRepo accountStore.User,
+	userStore authAtore.User,
 	authAttemptCache authStore.Attempt,
 	tokenCache authStore.Token,
 	hasher hash.Handler,
 	refreshToken token.Handler[token.Auth],
 	accessToken token.Handler[token.Auth],
-	authJailer authService.Jailer,
+	jailer authService.Jailer,
 ) Auth {
 	return Auth{
-		userRepo,
-		authAttemptCache,
-		tokenCache,
-		refreshToken,
-		accessToken,
-		authJailer,
-		hasher}
-}
-
-func (as Auth) Register(username, password, email string) error {
-	digest, err := as.hasher.Generate(password)
-	if err != nil {
-		return fmt.Errorf("service<Auth.Register>: %w", err)
-	}
-
-	user, err := account.NewUser(nil, username, string(digest), email)
-	if err != nil {
-		return fmt.Errorf("service<Auth.Register>: %w", err)
-	}
-
-	if err := as.userRepo.Create(user); err != nil {
-		return fmt.Errorf("service<Auth.Register>: %w", err)
-	}
-	return nil
+		userStore:        userStore,
+		authAttemptCache: authAttemptCache,
+		tokenCache:       tokenCache,
+		refreshToken:     refreshToken,
+		accessToken:      accessToken,
+		jailer:           jailer,
+		hasher:           hasher}
 }
 
 func (as Auth) Login(username, password string) (string, string, error) {
-	user, err := as.userRepo.GetByUsername(username)
+	user, err := as.userStore.GetByUsername(username)
 	if err != nil {
 		return "", "", fmt.Errorf("service<Auth.Login>: %w", err)
 	}
@@ -111,19 +93,20 @@ func (as Auth) Refresh(token string) (string, string, error) {
 	}
 
 	oldToken, err := as.tokenCache.FindByOwner(payload.UserId)
-	switch {
-	case err != nil:
-		return "", "", err
-	case oldToken == "":
-		err := oops.Unauthorized{
-			Err: errors.New("Active refresh token not found"),
-			Msg: "Active refresh token not found"}
+	if err != nil {
 		return "", "", fmt.Errorf("service<Auth.Refresh>: %w", err)
-	case oldToken != token:
-		err := oops.Unauthorized{
-			Err: errors.New("Given token does not match with the active one"),
-			Msg: "Given token does not match with the active one"}
-		return "", "", fmt.Errorf("service<Auth.Refresh>: %w", err)
+	} else if oldToken == "" {
+		return "", "", fmt.Errorf(
+			"service<Auth.Refresh>: %w",
+			oops.Unauthorized{
+				Err: errors.New("Active refresh token not found"),
+				Msg: "Active refresh token not found"})
+	} else if oldToken != token {
+		return "", "", fmt.Errorf(
+			"service<Auth.Refresh>: %w",
+			oops.Unauthorized{
+				Err: errors.New("Given token does not match with the active one"),
+				Msg: "Given token does not match with the active one"})
 	}
 
 	accessToken, err := as.accessToken.Encode(*payload)
@@ -158,37 +141,5 @@ func (as Auth) Infer(token string) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("service<Auth.Infer>: %w", err)
 	}
-
 	return uint64(payload.UserId), nil
-}
-
-func (as Auth) HandleRegisteredUsers(
-	maxCount uint,
-	payloader func(users []uint64) ([]byte, error),
-	send func([]byte) error,
-) error {
-	outbox, err := as.userRepo.GetRegisterOutbox(maxCount)
-	switch {
-	case err != nil:
-		return fmt.Errorf("service<Auth.HandleNewUsers>: %w", err)
-	case len(outbox) == 0:
-		return nil
-	}
-
-	handledUser := []uint64{}
-	for _, o := range outbox {
-		handledUser = append(handledUser, o.UserId())
-	}
-	payload, err := payloader(handledUser)
-	if err != nil {
-		return fmt.Errorf("service<Auth.HandleNewUsers>: %w", err)
-	}
-	if err := send(payload); err != nil {
-		return fmt.Errorf("service<Auth.HandleNewUsers>: %w", err)
-	}
-
-	if err := as.userRepo.ResolveRegisterOutbox(handledUser); err != nil {
-		return fmt.Errorf("service<Auth.HandleNewUsers>: %w", err)
-	}
-	return nil
 }

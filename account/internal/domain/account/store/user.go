@@ -7,8 +7,6 @@ import (
 
 type User interface {
 	GetById(id uint) (account.User, error)
-	GetByUsername(username string) (account.User, error)
-
 	Create(a account.User) error
 	Update(a account.User) error
 

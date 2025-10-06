@@ -57,7 +57,7 @@ func RunApp() {
 	defer cacheClient.Close()
 
 	upSince := time.Now().Unix()
-	secretHandler := hash.NewBcrypt(10)
+	hasher := hash.NewBcrypt(10)
 	accessTokenHandler := token.NewJwt[token.Auth](
 		envTokenIssuer,
 		envTokenSecret,
@@ -73,25 +73,24 @@ func RunApp() {
 	authJailer := authService.NewJailer(
 		3, 3, 120*time.Second, 10*time.Second)
 
-	accountRepo := persistence.NewPgUser(dbClient)
-	authAttemptCache := persistence.NewValkeyAuthAttempt(
+	authStore := persistence.NewPgAuth(dbClient)
+	accountStore := persistence.NewPgAccount(dbClient)
+	authCache := persistence.NewValkeyAuth(
 		cacheClient,
-		authJailer.RetentionTime(15*time.Second))
-	tokenCache := persistence.NewValkeyToken(
-		cacheClient,
+		authJailer.RetentionTime(15*time.Second),
 		time.Duration(envRefreshTokenLifetime)*time.Second)
 
+	accountService := service.NewAccount(accountStore, hasher)
 	authService := service.NewAuth(
-		accountRepo,
-		authAttemptCache,
-		tokenCache,
-		secretHandler,
+		authStore,
+		authCache,
+		authCache,
+		hasher,
 		accessTokenHandler,
 		refreshTokenHandler,
 		authJailer)
-	controller := controller.NewAuth(authService)
-	authRoute := route.NewAuth(controller)
-	apiRoute := route.NewApi(upSince)
+	authController := controller.NewAuth(authService)
+	accountController := controller.NewAccount(accountService)
 
 	// ========================================
 	// Routings
@@ -102,9 +101,10 @@ func RunApp() {
 	app.Use(middleware.Logger)
 	app.Use(middleware.Recoverer)
 
-	authRoute.Use(v1)
+	route.NewAccount(accountController).Use(v1)
+	route.NewAuth(authController).Use(v1)
 	app.Mount("/api/v1", v1)
-	apiRoute.Use(app)
+	route.NewApi(upSince).Use(app)
 
 	// ========================================
 	// Side effects, susbcriptions
@@ -135,7 +135,7 @@ func RunApp() {
 
 		t := time.NewTicker(time.Second * 2)
 		for range t.C {
-			if err := controller.PublishNewUser(20, send); err != nil {
+			if err := accountController.PublishNewUser(20, send); err != nil {
 				log.Printf("%s: %v\n", moduleName, err)
 			}
 		}

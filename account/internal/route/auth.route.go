@@ -6,14 +6,13 @@ import (
 	"github.com/solsteace/kochira/account/internal/controller"
 )
 
-type authRoute struct {
+type auth struct {
 	controller controller.Auth
 }
 
-func (ar authRoute) Use(parent *chi.Mux) {
+func (ar auth) Use(parent *chi.Mux) {
 	auth := chi.NewRouter()
 	auth.Get("/infer", reqres.HttpHandlerWithError(ar.controller.Infer))
-	auth.Post("/register", reqres.HttpHandlerWithError(ar.controller.Register))
 	auth.Post("/login", reqres.HttpHandlerWithError(ar.controller.Login))
 	auth.Post("/refresh", reqres.HttpHandlerWithError(ar.controller.Refresh))
 	auth.Post("/logout", reqres.HttpHandlerWithError(ar.controller.Logout))
@@ -21,6 +20,6 @@ func (ar authRoute) Use(parent *chi.Mux) {
 	parent.Mount("/auth", auth)
 }
 
-func NewAuth(controller controller.Auth) authRoute {
-	return authRoute{controller}
+func NewAuth(controller controller.Auth) auth {
+	return auth{controller: controller}
 }
