@@ -21,10 +21,13 @@ type Amqp struct {
 	channel   map[string]*amqp091.Channel
 
 	queueMu *sync.RWMutex
-	queue   map[string]struct {
-		// _    amqp091.Queue
-		opts amqpQueueOpts
-	}
+	queue   map[string]amqpQueueOpts
+
+	exchangeMu *sync.RWMutex
+	exchange   map[string]amqpExchangeOpts
+
+	bindingMu *sync.RWMutex
+	binding   map[string]amqpQueueBindOpts
 
 	consumerMu *sync.RWMutex
 	consumer   map[string]struct {
@@ -91,14 +94,26 @@ func (a *Amqp) restore() error {
 		tempChannel = channel
 	}
 
-	for _, spec := range a.queue {
-		if err := a.AddQueue(tempChannel, spec.opts); err != nil {
+	for _, opts := range a.exchange {
+		if err := a.AddExchange(tempChannel, opts); err != nil {
 			return fmt.Errorf("utility<amqp.restore>: %w", err)
 		}
 	}
 
-	for _, spec := range a.consumer {
-		if err := a.AddConsumer(tempChannel, spec.fx, spec.opts); err != nil {
+	for _, opts := range a.queue {
+		if err := a.AddQueue(tempChannel, opts); err != nil {
+			return fmt.Errorf("utility<amqp.restore>: %w", err)
+		}
+	}
+
+	for _, opts := range a.binding {
+		if err := a.BindQueue(tempChannel, opts); err != nil {
+			return fmt.Errorf("utility<amqp.restore>: %w", err)
+		}
+	}
+
+	for _, opts := range a.consumer {
+		if err := a.AddConsumer(tempChannel, opts.fx, opts.opts); err != nil {
 			return fmt.Errorf("utility<amqp.restore>: %w", err)
 		}
 	}
@@ -150,12 +165,36 @@ func (a *Amqp) AddQueue(channel string, opts amqpQueueOpts) error {
 	}
 
 	a.queueMu.Lock()
-	a.queue[opts.name] = struct {
-		// _    amqp091.Queue
-		opts amqpQueueOpts
-	}{opts}
+	a.queue[opts.name] = opts
 	a.queueMu.Unlock()
 
+	return nil
+}
+
+func (a Amqp) AddExchange(channel string, opts amqpExchangeOpts) error {
+	a.channelMu.RLock()
+	c, cOk := a.channel[channel]
+	if !cOk {
+		err := fmt.Errorf("Channel %s is not registered yet", channel)
+		return fmt.Errorf("utility<amqp.AddExcahnge>: %w", err)
+	}
+	a.channelMu.RUnlock()
+
+	err := c.ExchangeDeclare(
+		opts.name,
+		opts.kind,
+		opts.durable,
+		opts.autoDelete,
+		opts.internal,
+		opts.noWait,
+		opts.opts)
+	if err != nil {
+		return fmt.Errorf("utility<amqp.AddExchange>: %w", err)
+	}
+
+	a.exchangeMu.Lock()
+	a.exchange[opts.name] = opts
+	a.exchangeMu.Unlock()
 	return nil
 }
 
@@ -240,8 +279,8 @@ func (a Amqp) Publish(channel string, payload []byte, opts amqpPublishOpts) erro
 			Body:        payload})
 }
 
-// Wraps call to Channel.QueueBind
-func (a Amqp) QueueBind(channel string, opts amqpQueueBindOpts) error {
+// Wraps call to Channel.BindQueue
+func (a Amqp) BindQueue(channel string, opts amqpQueueBindOpts) error {
 	a.channelMu.RLock()
 	c, cOk := a.channel[channel]
 	if !cOk {
@@ -250,25 +289,34 @@ func (a Amqp) QueueBind(channel string, opts amqpQueueBindOpts) error {
 	}
 	a.channelMu.RUnlock()
 
-	return c.QueueBind(
+	err := c.QueueBind(
 		opts.name,
 		opts.key,
 		opts.exchange,
 		opts.noWait,
 		opts.args)
+	if err != nil {
+		return fmt.Errorf("utility<amqp.QueueBind>: %w", err)
+	}
+
+	a.bindingMu.Lock()
+	a.binding[opts.exchange] = opts
+	a.bindingMu.Unlock()
+	return nil
 }
 
 func NewAmqp() Amqp {
 	return Amqp{
 		connMu: &sync.RWMutex{},
 
-		queueMu: &sync.RWMutex{},
-		queue: make(map[string]struct {
-			// _    amqp091.Queue
-			opts amqpQueueOpts
-		}),
-		channelMu: &sync.RWMutex{},
-		channel:   make(map[string]*amqp091.Channel),
+		queueMu:    &sync.RWMutex{},
+		queue:      make(map[string]amqpQueueOpts),
+		channelMu:  &sync.RWMutex{},
+		channel:    make(map[string]*amqp091.Channel),
+		exchangeMu: &sync.RWMutex{},
+		exchange:   make(map[string]amqpExchangeOpts),
+		bindingMu:  &sync.RWMutex{},
+		binding:    make(map[string]amqpQueueBindOpts),
 
 		consumerMu: &sync.RWMutex{},
 		consumer: make(map[string]struct {
