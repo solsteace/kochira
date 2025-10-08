@@ -123,6 +123,9 @@ func RunApp() {
 		listener{
 			shorteningController.ListenFinishShortening,
 			service.FinishShorteningQueue},
+		listener{
+			shorteningController.ListenSubscriptionExpired,
+			service.SubscriptionExpiredQueue},
 	}
 	for _, l := range listeners {
 		opts := utility.NewDefaultAmqpConsumeOpts(l.queue, false)

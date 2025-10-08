@@ -13,13 +13,21 @@ import (
 )
 
 const (
-	CheckSubscriptionQueue = "check.subscription"
-	FinishShorteningQueue  = "finish.shortening"
+	CheckSubscriptionQueue   = "check.subscription"
+	FinishShorteningQueue    = "finish.shortening"
+	SubscriptionExpiredQueue = "test"
 )
 
 type Shortening struct {
 	store     store.Link[persistence.ShorteningQueryParams]
 	messenger *utility.Amqp // interface later
+}
+
+func NewShortening(
+	store store.Link[persistence.ShorteningQueryParams],
+	messenger *utility.Amqp,
+) Shortening {
+	return Shortening{store, messenger}
 }
 
 func (s Shortening) GetSelf(userId uint64, page, limit *uint) ([]shortening.Link, error) {
@@ -77,7 +85,7 @@ func (s Shortening) UpdateById(
 			oops.Forbidden{Msg: "You don't have access to this link"})
 	}
 
-	requirePremiumSubscription := oldLink.AliasedWith(alias)
+	requirePremiumSubscription := oldLink.HasCustomAlias()
 	newLink, err := shortening.NewLink(
 		&id,
 		userId,
@@ -269,26 +277,7 @@ func (s Shortening) HandleLinkShortened(
 
 // # TODO
 //
-// (A copy from HandleLinkShortened, handle if the handler needs to fetch user stats).
-// There's a chance of race condition if this function was called in many goroutines
-// with the same userId.
-//
-// ## Reason
-//
-// Race condition "happens in the database-level". There's a chance that, after goroutine
-// `A` fetches current user stats, goroutine `B“ do writes that affects this stats. This
-// would disrupt the subscription perk handling.
-//
-// For example, goroutine `A` thought user `X` only has 1 link quota left. However,
-// after `A` deducted this, goroutine `B` adds a new link which reduces the quota
-// to 0. This makes `A`'s view on current user stats doesn't sync with what actually
-// in the database.
-//
-// ## Suggestions
-//
-// - optimistic locking (via updatedAt). Challenge: Requires retry mechanism whenever needed
-//
-// - row locking. Challenge: May need to inject business logic between database queries
+// (Read `HandleLinkShortened` and handle if the handler needs to fetch user stats).
 func (ss Shortening) HandleShortConfigured(
 	msgId uint64,
 	allowEditShortUrl bool,
@@ -307,7 +296,7 @@ func (ss Shortening) HandleShortConfigured(
 			oops.Forbidden{Msg: "You don't have access to this link"})
 	}
 
-	if oldLink.AliasedWith(msgCtx.Alias()) && !allowEditShortUrl {
+	if oldLink.HasCustomAlias() && !allowEditShortUrl {
 		return fmt.Errorf(
 			"service<Shortening.HandleShortConfigured>: %w",
 			oops.Forbidden{Msg: "Your subscription doesn't allow short editing"})
@@ -333,9 +322,37 @@ func (ss Shortening) HandleShortConfigured(
 	return nil
 }
 
-func NewShortening(
-	store store.Link[persistence.ShorteningQueryParams],
-	messenger *utility.Amqp,
-) Shortening {
-	return Shortening{store, messenger}
+func (ss Shortening) HandleSubscriptionExpired(
+	userId uint64,
+	linkCountLimit uint,
+	allowEditShortUrl bool,
+) error {
+	links, err := ss.store.GetOpenedFromOldestByUser(userId)
+	if err != nil {
+		return fmt.Errorf("service<Shortening.HandleSubscriptionExpired>: %w", err)
+	}
+
+	deactivatedLinks := []uint64{}
+	keptLinks := []uint64{}
+	for _, l := range links {
+		isPremiumLink := l.HasCustomAlias()
+		if isPremiumLink {
+			deactivatedLinks = append(deactivatedLinks, l.Id())
+		} else {
+			keptLinks = append(keptLinks, l.Id())
+		}
+	}
+	if remainingQuota := int(linkCountLimit) - len(keptLinks); remainingQuota < 0 {
+		excessIdx := -1 * remainingQuota
+		deactivatedLinks = append(deactivatedLinks, keptLinks[:excessIdx]...)
+		keptLinks = keptLinks[excessIdx:]
+	}
+	if len(deactivatedLinks) == 0 {
+		return nil
+	}
+
+	if err = ss.store.ApplySubscriptionExpiration(deactivatedLinks); err != nil {
+		return fmt.Errorf("service<Shortening.HandleSubscriptionExpired>: %w", err)
+	}
+	return nil
 }

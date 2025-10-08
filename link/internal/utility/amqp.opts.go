@@ -21,6 +21,27 @@ func NewDefaultAmqpQueueOpts(name string) amqpQueueOpts {
 		opts:       nil}
 }
 
+type amqpExchangeOpts struct {
+	name       string        // what should we name the exchange?
+	kind       string        // what is the type of the exchange? (available: fanout, topic, direct, headers)
+	durable    bool          // Upon server restart, should the exchange be kept?
+	autoDelete bool          // When no one bound to this exchange, should this be deleted?
+	internal   bool          // [read ExchangeDeclare, for now]
+	noWait     bool          // [read ExchangeDeclare, for now]
+	opts       amqp091.Table // arguments
+}
+
+func NewDefaultAmqpExchangeOpts(name, kind string) amqpExchangeOpts {
+	return amqpExchangeOpts{
+		name:       name,
+		kind:       kind,
+		durable:    true,
+		autoDelete: false,
+		internal:   false,
+		noWait:     false,
+		opts:       nil}
+}
+
 type amqpConsumeOpts struct {
 	queue     string        // which queue we're receiving messages from?
 	consumer  string        // what name should I identify myself with?

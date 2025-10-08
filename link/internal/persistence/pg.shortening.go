@@ -256,6 +256,50 @@ func (repo pg) CountByUserIdExcept(userId uint64, linkId uint64) (shortening.Sta
 	return shortening.NewStats(count), nil
 }
 
+func (repo pg) GetOpenedFromOldestByUser(userId uint64) ([]shortening.Link, error) {
+	query := `
+		SELECT *
+		FROM links
+		WHERE user_id = $1 AND is_open
+		ORDER BY updated_at`
+	args := []any{userId}
+	rows := new([]pgLink)
+	if err := repo.db.Select(rows, query, args...); err != nil {
+		return []shortening.Link{}, fmt.Errorf("persistence<pg.GetFromOldestByUser>: %w", err)
+	}
+
+	links := []shortening.Link{}
+	for _, r := range *rows {
+		link, err := r.toShortening()
+		if err != nil {
+			return []shortening.Link{}, fmt.Errorf("persistence<pg.GetFromOldestByUser>: %w", err)
+		}
+		links = append(links, link)
+	}
+	return links, nil
+}
+
+// =================
+// event-related
+// =================
+
+func (repo pg) ApplySubscriptionExpiration(deactivatedLinks []uint64) error {
+	query, args, err := sqlx.In(`
+		UPDATE links
+		SET 
+			is_open = false,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id IN (?)`, deactivatedLinks)
+	if err != nil {
+		return fmt.Errorf("persistence<pg.ApplySubscriptionExpiration>: %w", err)
+	}
+	fmt.Println(query)
+	if _, err := repo.db.Exec(repo.db.Rebind(query), args...); err != nil {
+		return fmt.Errorf("persistence<pg.ApplySubscriptionExpiration>: %w", err)
+	}
+	return nil
+}
+
 type pgLinkShortened struct {
 	Id     uint64 `db:"id"`
 	UserId uint64 `db:"user_id"`

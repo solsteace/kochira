@@ -37,6 +37,12 @@ func (l *Link) Shorten() {
 	l.shortened = string(shortened)
 	l.alias = l.shortened
 }
+func (l *Link) Activate() {
+	l.isOpen = true
+}
+func (l *Link) Deactivate() {
+	l.isOpen = false
+}
 
 func (l Link) HadExpired() bool {
 	return time.Now().After(l.expiredAt)
@@ -44,8 +50,8 @@ func (l Link) HadExpired() bool {
 func (l Link) AccessibleBy(userId uint64) bool {
 	return l.userId == userId
 }
-func (l Link) AliasedWith(alias string) bool {
-	return l.shortened != alias
+func (l Link) HasCustomAlias() bool {
+	return l.shortened != l.alias
 }
 
 func (l Link) Id() uint64           { return l.id }

@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/solsteace/go-lib/reqres"
 	shorteningMsg "github.com/solsteace/kochira/link/internal/domain/shortening/messaging"
-	outsideMessaging "github.com/solsteace/kochira/link/internal/messaging"
+	"github.com/solsteace/kochira/link/internal/messaging"
 	"github.com/solsteace/kochira/link/internal/middleware"
 	"github.com/solsteace/kochira/link/internal/service"
 
@@ -17,9 +17,10 @@ import (
 )
 
 type Shortening struct {
-	service           service.Shortening
-	checkSubscription outsideMessaging.CheckSubscriptionMessenger
-	finishShortening  outsideMessaging.FinishShorteningMessenger
+	service             service.Shortening
+	checkSubscription   messaging.CheckSubscriptionMessenger
+	finishShortening    messaging.FinishShorteningMessenger
+	subscriptionExpired messaging.SubscriptionExpiredMessenger
 }
 
 func (lr Shortening) GetSelf(w http.ResponseWriter, r *http.Request) error {
@@ -179,10 +180,34 @@ func (sc Shortening) ListenFinishShortening(msg []byte) error {
 	return nil
 }
 
+func (sc Shortening) ListenSubscriptionExpired(msg []byte) error {
+	payload, err := sc.subscriptionExpired.FromMsg(msg)
+	if err != nil {
+		return fmt.Errorf("controller<Shortening.ListenSubscriptionExpired>: %w", err)
+	}
+
+	if sc.subscriptionExpired.Version != payload.Meta.Version {
+		return fmt.Errorf(
+			"controller<Shortening.ListenFinishShortening>: "+
+				"incompatible version between messenger(v:%d) and message(v:%d)",
+			sc.finishShortening.Version, payload.Meta.Version)
+	}
+
+	err = sc.service.HandleSubscriptionExpired(
+		payload.Data.UserId,
+		payload.Data.Perk.Limit,
+		payload.Data.Perk.AllowShortEdit)
+	if err != nil {
+		return fmt.Errorf("controller<Shortening.ListenSubscriptionExpired>: %w", err)
+	}
+	return nil
+}
+
 // Creates new `Shortening` and initiates essentials for messaging purposes
 func NewShortening(service service.Shortening) Shortening {
 	return Shortening{
-		service,
-		outsideMessaging.CheckSubscriptionMessenger{Version: 1},
-		outsideMessaging.FinishShorteningMessenger{Version: 1}}
+		service:             service,
+		checkSubscription:   messaging.CheckSubscriptionMessenger{Version: 1},
+		finishShortening:    messaging.FinishShorteningMessenger{Version: 1},
+		subscriptionExpired: messaging.SubscriptionExpiredMessenger{Version: 1}}
 }

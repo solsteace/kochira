@@ -12,6 +12,7 @@ type Link[queryParams any] interface {
 	GetManyByUser(userId uint64, q queryParams) ([]shortening.Link, error)
 	GetById(id uint64) (shortening.Link, error)
 	CountByUserIdExcept(userId uint64, linkId uint64) (shortening.Stats, error) // Retrieves the number of links owned by user, excluding certain link
+	GetOpenedFromOldestByUser(userId uint64) ([]shortening.Link, error)
 
 	// Commands ===========
 
@@ -29,4 +30,6 @@ type Link[queryParams any] interface {
 	GetShortConfigured(limit uint) ([]messaging.ShortConfigured, error) // Retrieves pending `shortConfigured` messages
 	GetShortConfiguredById(id uint64) (messaging.ShortConfigured, error)
 	ResolveShortConfigured(id []uint64) error // Resolves pending `shortConfigured` messages
+
+	ApplySubscriptionExpiration(deactivatedLinks []uint64) error
 }
