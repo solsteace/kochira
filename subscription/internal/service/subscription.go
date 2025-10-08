@@ -8,6 +8,7 @@ import (
 	"github.com/solsteace/kochira/subscription/internal/domain/subscription/messaging"
 	"github.com/solsteace/kochira/subscription/internal/domain/subscription/service"
 	"github.com/solsteace/kochira/subscription/internal/domain/subscription/store"
+	"github.com/solsteace/kochira/subscription/internal/domain/subscription/value"
 	"github.com/solsteace/kochira/subscription/internal/utility"
 )
 
@@ -80,13 +81,16 @@ func (p Subscription) Check(
 	return nil
 }
 
-func (p Subscription) Watch() error {
-	return nil
-}
-
 // ==============================
 // Messages
 // ==============================
+
+func (p Subscription) WatchExpiringSubscription(limit uint) error {
+	if err := p.store.WatchExpiringSubscription(limit); err != nil {
+		return fmt.Errorf("service<Subscription.WatchExpiringSubscription>: %w", err)
+	}
+	return nil
+}
 
 func (p Subscription) PublishFinishShortening(
 	limit uint,
@@ -95,8 +99,7 @@ func (p Subscription) PublishFinishShortening(
 	msg, err := p.store.GetSubscriptionChecked(limit)
 	if err != nil {
 		return fmt.Errorf("service<Subscription.PublishFinishShortening>: %w", err)
-	}
-	if len(msg) == 0 {
+	} else if len(msg) == 0 {
 		return nil
 	}
 
@@ -116,6 +119,39 @@ func (p Subscription) PublishFinishShortening(
 	}
 
 	if err := p.store.ResolveSubscriptionChecked(resolved); err != nil {
+		return fmt.Errorf("service<Shortening.PublishFinishShortening>: %w", err)
+	}
+	return nil
+}
+
+func (p Subscription) PublishSubscriptionExpired(
+	limit uint,
+	serialize func(msg messaging.SubscriptionExpired, perk value.Perk) ([]byte, error),
+) error {
+	msg, err := p.store.GetSubscriptionExpired(limit)
+	if err != nil {
+		return fmt.Errorf("service<Subscription.PublishSubscriptionExpired>: %w", err)
+	} else if len(msg) == 0 {
+		return nil
+	}
+
+	perk := p.perkInferer.Basic()
+	resolved := []uint64{}
+	for _, m := range msg {
+		payload, err := serialize(m, perk)
+		if err != nil {
+			return fmt.Errorf("service<Shortening.PublishSubscriptionExpired>: %w", err)
+		}
+
+		err = p.messenger.Publish("default", payload, utility.NewDefaultAmqpPublishOpts(
+			"example", "test", "application/json"))
+		if err != nil {
+			return fmt.Errorf("service<Shortening.PublishFinishShortening>: %w", err)
+		}
+		resolved = append(resolved, m.Id())
+	}
+
+	if err := p.store.ResolveSubscriptionExpired(resolved); err != nil {
 		return fmt.Errorf("service<Shortening.PublishFinishShortening>: %w", err)
 	}
 	return nil

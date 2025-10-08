@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -60,7 +61,10 @@ func (repo pg) FilterExisting(id []uint64) ([]uint64, error) {
 func (repo pg) GetByOwner(id uint64) (subscription.Subscription, error) {
 	row := new(pgSubscription)
 	query := `
-		SELECT *
+		SELECT
+			id, 
+			user_id,
+			expired_at
 		FROM subscriptions
 		WHERE user_id = $1`
 	args := []any{id}
@@ -84,14 +88,6 @@ func (repo pg) Create(subscriptions []subscription.Subscription) error {
 	if _, err := repo.db.NamedExec(query, rows); err != nil {
 		return fmt.Errorf("persistence<pg.Create>: %w", err)
 	}
-	return nil
-}
-
-func (repo pg) Update(s subscription.Subscription) error {
-	return nil
-}
-
-func (repo pg) Delete(id uint64) error {
 	return nil
 }
 
@@ -178,6 +174,102 @@ func (repo pg) ResolveSubscriptionChecked(id []uint64) error {
 
 	if _, err := repo.db.Exec(repo.db.Rebind(query), args...); err != nil {
 		return fmt.Errorf("persistence<pg.ResolveSubscriptionChecked>: %w", err)
+	}
+	return nil
+}
+
+type pgSubscriptionExpired struct {
+	Id     uint64 `db:"id"`
+	UserId uint64 `db:"user_id"`
+}
+
+func (row pgSubscriptionExpired) ToMsg() messaging.SubscriptionExpired {
+	return messaging.NewSubscriptionExpired(row.Id, row.UserId)
+}
+
+func (repo pg) WatchExpiringSubscription(limit uint) error {
+	expiredSubscription := new([]pgSubscriptionExpired)
+	query := `
+		SELECT 
+			id,
+			user_id
+		FROM subscriptions
+		WHERE 
+			expired_at < CURRENT_TIMESTAMP
+			AND checked_at IS NULL
+		LIMIT $1`
+	args := []any{limit}
+	if err := repo.db.Select(expiredSubscription, query, args...); err != nil {
+		return fmt.Errorf("persistence<pg.WatchExpiringSubscription>: %w", err)
+	} else if len(*expiredSubscription) == 0 {
+		return nil
+	}
+
+	ctx, _ := context.WithCancel(context.Background())
+	tx, err := repo.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("persistence<pg.WatchExpiringSubscription>: %w", err)
+	}
+	defer tx.Rollback()
+
+	query = `
+		INSERT INTO subscription_expired_outbox(user_id)
+		VALUES (:user_id)`
+	if _, err := tx.NamedExec(query, *expiredSubscription); err != nil {
+		return fmt.Errorf("persistence<pg.WatchExpiringSubscription>: %w", err)
+	}
+
+	userId := []uint64{}
+	for _, s := range *expiredSubscription {
+		userId = append(userId, s.UserId)
+	}
+	query, args, err = sqlx.In(`
+		UPDATE subscriptions
+		SET checked_at = CURRENT_TIMESTAMP
+		WHERE user_id IN (?)`, userId)
+	if err != nil {
+		return fmt.Errorf("persistence<pg.WatchExpiringSubscription>: %w", err)
+	}
+	if _, err := tx.Exec(tx.Rebind(query), args...); err != nil {
+		return fmt.Errorf("persistence<pg.WatchExpiringSubscription>: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("persistence<pg.WatchExpiringSubscription>: %w", err)
+	}
+	return nil
+}
+
+func (repo pg) GetSubscriptionExpired(limit uint) ([]messaging.SubscriptionExpired, error) {
+	query := `
+		SELECT id, user_id
+		FROM subscription_expired_outbox
+		WHERE NOT is_done
+		LIMIT $1`
+	rows := new([]pgSubscriptionExpired)
+	args := []any{limit}
+	if err := repo.db.Select(rows, query, args...); err != nil {
+		return []messaging.SubscriptionExpired{}, fmt.Errorf(
+			"persistence<pg.GetSubscriptionExpired>: %w", err)
+	}
+
+	msg := []messaging.SubscriptionExpired{}
+	for _, r := range *rows {
+		msg = append(msg, r.ToMsg())
+	}
+	return msg, nil
+}
+
+func (repo pg) ResolveSubscriptionExpired(id []uint64) error {
+	query, args, err := sqlx.In(`
+		UPDATE subscription_expired_outbox
+		SET is_done = true
+		WHERE id IN (?)`, id)
+	if err != nil {
+		return fmt.Errorf("persistence<pg.ResolveSubscriptionExpired>: %w", err)
+	}
+	if _, err := repo.db.Exec(repo.db.Rebind(query), args...); err != nil {
+		return fmt.Errorf("persistence<pg.ResolveSubscriptionExpired>: %w", err)
 	}
 	return nil
 }

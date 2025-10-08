@@ -9,14 +9,15 @@ import (
 type Subscription interface {
 	GetByOwner(id uint64) (subscription.Subscription, error)
 	FilterExisting(id []uint64) ([]uint64, error)
-
 	Create(s []subscription.Subscription) error
-	Update(s subscription.Subscription) error
-	Delete(userId uint64) error
 
 	// Events ===========
 
 	CreateSubscriptionChecked(contextId uint64, usecase string, perk value.Perk) error
 	GetSubscriptionChecked(limit uint) ([]messaging.SubscriptionChecked, error)
 	ResolveSubscriptionChecked(id []uint64) error
+
+	WatchExpiringSubscription(limit uint) error
+	GetSubscriptionExpired(limit uint) ([]messaging.SubscriptionExpired, error)
+	ResolveSubscriptionExpired(id []uint64) error
 }

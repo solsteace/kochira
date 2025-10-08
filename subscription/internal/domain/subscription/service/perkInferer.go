@@ -32,3 +32,6 @@ func (l PerkInferer) Infer(subscription subscription.Subscription) value.Perk {
 	}
 	return l.basic
 }
+
+func (l PerkInferer) Basic() value.Perk   { return l.basic }
+func (l PerkInferer) Premium() value.Perk { return l.premium }
