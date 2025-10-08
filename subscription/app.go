@@ -24,8 +24,6 @@ import (
 	"github.com/solsteace/kochira/subscription/internal/domain/subscription/value"
 )
 
-const moduleName = "kochira/subscription"
-
 type publisher struct {
 	interval time.Duration // In what interval the routine should be done?
 	callback func() error  // What to do in the routine?
@@ -40,8 +38,8 @@ func RunApp() {
 	upSince := time.Now().Unix()
 	dbCfg, err := pgx.ParseConfig(envDbUrl)
 	if err != nil {
-		err2 := fmt.Errorf("subscription<RunApp>: DB init: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
+		log.Fatalf("kochira/subscription: %v",
+			fmt.Errorf("subscription<RunApp>: DB init: %w", err))
 	}
 	dbClient := sqlx.NewDb(stdlib.OpenDB(*dbCfg), "pgx")
 	dbClient.SetMaxOpenConns(25) // Based on your db's connection limit
@@ -49,8 +47,8 @@ func RunApp() {
 	dbClient.SetConnMaxLifetime(30 * time.Minute) // Replace connections periodically
 	dbClient.SetConnMaxIdleTime(30 * time.Second) // Close connections that aren't being used
 	if err := dbClient.Ping(); err != nil {
-		err2 := fmt.Errorf("subscription<RunApp>: DB ping: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
+		log.Fatalf("kochira/subscription: %v",
+			fmt.Errorf("subscription<RunApp>: DB ping: %w", err))
 	}
 	defer dbClient.Close()
 
@@ -60,8 +58,8 @@ func RunApp() {
 
 	<-mqInitReady
 	if err := mq.AddChannel("default"); err != nil {
-		err2 := fmt.Errorf("subscription<RunApp>: channel init: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
+		log.Fatalf("kochira/subscription: %v",
+			fmt.Errorf("subscription<RunApp>: channel init: %w", err))
 	}
 
 	exchanges := map[string]string{
@@ -78,8 +76,8 @@ func RunApp() {
 		for _, q := range queue {
 			err := mq.AddQueue(c, utility.NewDefaultAmqpQueueOpts(q))
 			if err != nil {
-				err2 := fmt.Errorf("subscription<RunApp>: queue init: %w", err)
-				log.Fatalf("%s: %v", moduleName, err2)
+				log.Fatalf("kochira/subscription: %v",
+					fmt.Errorf("subscription<RunApp>: queue init: %w", err))
 			}
 		}
 	}
@@ -126,7 +124,7 @@ func RunApp() {
 		t := time.NewTicker(5 * time.Second)
 		for range t.C {
 			if err := subscriptionService.WatchExpiringSubscription(500); err != nil {
-				log.Printf("internal<RunApp>: %v\n", err)
+				log.Printf("kochira/subscription: subscription<RunApp>: %v\n", err)
 			}
 		}
 	}()
@@ -156,7 +154,7 @@ func RunApp() {
 			t := time.NewTicker(p.interval)
 			for range t.C {
 				if err := p.callback(); err != nil {
-					log.Printf("internal<RunApp>: %v\n", err)
+					log.Printf("kochira/subscription: subscription<RunApp>: %v\n", err)
 				}
 			}
 		}()
@@ -172,13 +170,13 @@ func RunApp() {
 	for _, l := range listeners {
 		opts := utility.NewDefaultAmqpConsumeOpts(l.queue, false)
 		if err := mq.AddConsumer("default", l.callback, opts); err != nil {
-			log.Fatalf("internal<RunApp>: failed to setup listener: %v", err)
+			log.Fatalf("kochira/subscription: setup listener: %v", err)
 		}
 	}
 
 	// ========================================
 	// Init
 	// ========================================
-	fmt.Printf("%s: Server's running at :%d\n", moduleName, envPort)
+	log.Printf("kochira/subscription: server's running at :%d\n", envPort)
 	http.ListenAndServe(fmt.Sprintf(":%d", envPort), app)
 }
