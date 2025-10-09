@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/solsteace/kochira/account/internal/controller"
+	"github.com/solsteace/kochira/account/internal/messaging"
 	"github.com/solsteace/kochira/account/internal/persistence"
 	"github.com/solsteace/kochira/account/internal/route"
 	"github.com/solsteace/kochira/account/internal/service"
@@ -25,41 +26,20 @@ import (
 	authService "github.com/solsteace/kochira/account/internal/domain/auth/service"
 )
 
-const moduleName = "kochira/account"
+type publisher struct {
+	interval time.Duration // In what interval the routine should be done?
+	callback func() error  // What to do in the routine?
+}
+
+type listener struct {
+	callback func(msg []byte) error
+	queue    string
+}
 
 func RunApp() {
 	// ========================================
 	// Utils
 	// ========================================
-	// Props to: https://medium.com/@lokeahnming/that-time-i-took-down-my-production-site-with-too-many-database-connections-8758406445e5
-	dbCfg, err := pgx.ParseConfig(envDbUrl)
-	if err != nil {
-		err2 := fmt.Errorf("account<RunApp>: DB init: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
-	}
-	dbClient := sqlx.NewDb(stdlib.OpenDB(*dbCfg), "pgx")
-	dbClient.SetMaxOpenConns(25) // Based on your db's connection limit
-	dbClient.SetMaxIdleConns(10)
-	dbClient.SetConnMaxLifetime(30 * time.Minute) // Replace connections periodically
-	dbClient.SetConnMaxIdleTime(30 * time.Second) // Close connections that aren't being used
-	if err := dbClient.Ping(); err != nil {
-		err2 := fmt.Errorf("account<RunApp>: DB ping: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
-	}
-	defer dbClient.Close()
-
-	cacheClient, err := valkey.NewClient(
-		valkey.MustParseURL(envCacheUrl))
-	if err != nil {
-		err2 := fmt.Errorf("account<RunApp>: cache init: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
-	}
-	defer cacheClient.Close()
-
-	mq := utility.NewAmqp()
-	mqInitReady := make(chan struct{})
-	go mq.Start(envMqUrl, mqInitReady)
-
 	upSince := time.Now().Unix()
 	hasher := hash.NewBcrypt(10)
 	accessTokenHandler := token.NewJwt[token.Auth](
@@ -70,6 +50,41 @@ func RunApp() {
 		envTokenIssuer,
 		strings.Repeat(envTokenSecret, 2),
 		time.Duration(envRefreshTokenLifetime))
+	createSubscriptionMessenger := messaging.CreateSubscriptionMessenger{Version: 1}
+
+	// Props to: https://medium.com/@lokeahnming/that-time-i-took-down-my-production-site-with-too-many-database-connections-8758406445e5
+	dbCfg, err := pgx.ParseConfig(envDbUrl)
+	if err != nil {
+		log.Fatalf("kochira/account : %v",
+			fmt.Errorf("account<RunApp>: DB init: %w", err))
+	}
+	dbClient := sqlx.NewDb(stdlib.OpenDB(*dbCfg), "pgx")
+	dbClient.SetMaxOpenConns(25) // Based on your db's connection limit
+	dbClient.SetMaxIdleConns(10)
+	dbClient.SetConnMaxLifetime(30 * time.Minute) // Replace connections periodically
+	dbClient.SetConnMaxIdleTime(30 * time.Second) // Close connections that aren't being used
+	if err := dbClient.Ping(); err != nil {
+		log.Fatalf("kochira/account: %v",
+			fmt.Errorf("account<RunApp>: DB ping: %w", err))
+	}
+	defer dbClient.Close()
+
+	cacheClient, err := valkey.NewClient(
+		valkey.MustParseURL(envCacheUrl))
+	if err != nil {
+		log.Fatalf("kochira/account: %v",
+			fmt.Errorf("account<RunApp>: cache init: %w", err))
+	}
+	defer cacheClient.Close()
+
+	mq := utility.NewAmqp()
+	mqInitReady := make(chan struct{})
+	go mq.Start(envMqUrl, mqInitReady)
+	<-mqInitReady
+	if err := mq.AddChannel("default"); err != nil {
+		log.Fatalf("kochira/account: %v",
+			fmt.Errorf("account<RunApp>: channel init: %w", err))
+	}
 
 	// ========================================
 	// Layers
@@ -84,7 +99,7 @@ func RunApp() {
 		authJailer.RetentionTime(15*time.Second),
 		time.Duration(envRefreshTokenLifetime)*time.Second)
 
-	accountService := service.NewAccount(accountStore, hasher)
+	accountService := service.NewAccount(accountStore, hasher, &mq)
 	authService := service.NewAuth(
 		authStore,
 		authCache,
@@ -113,29 +128,27 @@ func RunApp() {
 	// ========================================
 	// Side effects, susbcriptions
 	// ========================================
-	<-mqInitReady
-	if err := mq.AddChannel("default"); err != nil {
-		err2 := fmt.Errorf("account<RunApp>: channel init: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
-	}
-
-	go func() {
-		opts := utility.NewDefaultAmqpPublishOpts("", service.CreateSubscriptionQueue, "application/json")
-		send := func(body []byte) error {
-			return mq.Publish("default", body, opts)
-		}
-
-		t := time.NewTicker(time.Second * 2)
-		for range t.C {
-			if err := accountController.PublishNewUser(20, send); err != nil {
-				log.Printf("%s: %v\n", moduleName, err)
+	publishers := []publisher{
+		publisher{
+			interval: time.Second * 2,
+			callback: func() error {
+				return accountService.HandleRegisteredUsers(
+					20, createSubscriptionMessenger.FromManyUserRegistered)
+			}}}
+	for _, p := range publishers {
+		go func() {
+			t := time.NewTicker(p.interval)
+			for range t.C {
+				if err := p.callback(); err != nil {
+					log.Printf("kochira/account: account<RunApp>: %v\n", err)
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	// ========================================
 	// Init
 	// ========================================
-	fmt.Printf("%s: Server's running at :%d\n", moduleName, envPort)
+	fmt.Printf("kochira/account: Server's running at :%d\n", envPort)
 	http.ListenAndServe(fmt.Sprintf(":%d", envPort), app)
 }

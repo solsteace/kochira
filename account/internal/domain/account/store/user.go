@@ -2,7 +2,7 @@ package store
 
 import (
 	"github.com/solsteace/kochira/account/internal/domain/account"
-	"github.com/solsteace/kochira/account/internal/domain/auth/message"
+	"github.com/solsteace/kochira/account/internal/domain/account/messaging"
 )
 
 type User interface {
@@ -11,7 +11,7 @@ type User interface {
 	Update(a account.User) error
 
 	// Fetches pending `registration` outboxes
-	GetRegisterOutbox(count uint) ([]message.UserRegistered, error)
+	GetRegisterOutbox(count uint) ([]messaging.UserRegistered, error)
 
 	// Resolves pending `registration` outboxes
 	ResolveRegisterOutbox(id []uint64) error

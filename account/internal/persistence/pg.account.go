@@ -9,7 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/solsteace/go-lib/oops"
 	"github.com/solsteace/kochira/account/internal/domain/account"
-	"github.com/solsteace/kochira/account/internal/domain/auth/message"
+	"github.com/solsteace/kochira/account/internal/domain/account/messaging"
 )
 
 type pgAccount struct {
@@ -49,8 +49,8 @@ type pgAccountRegistrationOutbox struct {
 	IsDone bool   `db:"is_done"`
 }
 
-func (row pgAccountRegistrationOutbox) toOutbox() message.UserRegistered {
-	return message.NewRegister(row.Id, row.UserId, row.IsDone)
+func (row pgAccountRegistrationOutbox) toOutbox() messaging.UserRegistered {
+	return messaging.NewRegister(row.Id, row.UserId, row.IsDone)
 }
 
 func newPgRegistrationOutboxRow(id uint64, userId uint64, isDone bool) pgAccountRegistrationOutbox {
@@ -131,7 +131,7 @@ func (repo pgAccount) Update(a account.User) error {
 	return nil
 }
 
-func (repo pgAccount) GetRegisterOutbox(count uint) ([]message.UserRegistered, error) {
+func (repo pgAccount) GetRegisterOutbox(count uint) ([]messaging.UserRegistered, error) {
 	rows := new([]pgAccountRegistrationOutbox)
 	query := `
 		SELECT *
@@ -140,10 +140,10 @@ func (repo pgAccount) GetRegisterOutbox(count uint) ([]message.UserRegistered, e
 		LIMIT $1 `
 	args := []any{count}
 	if err := repo.db.Select(rows, query, args...); err != nil {
-		return []message.UserRegistered{}, fmt.Errorf("persistence<pgAccount.GetRegisterOutbox>: %w", err)
+		return []messaging.UserRegistered{}, fmt.Errorf("persistence<pgAccount.GetRegisterOutbox>: %w", err)
 	}
 
-	outbox := []message.UserRegistered{}
+	outbox := []messaging.UserRegistered{}
 	for _, r := range *rows {
 		outbox = append(outbox, r.toOutbox())
 	}
@@ -154,7 +154,7 @@ func (repo pgAccount) ResolveRegisterOutbox(id []uint64) error {
 	query, args, err := sqlx.In(`
 		UPDATE register_outbox
 		SET is_done = true
-		WHERE user_id IN (?)`, id)
+		WHERE id IN (?)`, id)
 	if err != nil {
 		return fmt.Errorf("persistence<pgAccount.ResolveRegisterOutbox>: %w", err)
 	}

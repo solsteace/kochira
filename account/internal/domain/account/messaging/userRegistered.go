@@ -1,4 +1,4 @@
-package message
+package messaging
 
 type UserRegistered struct {
 	id     uint64

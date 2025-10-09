@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/solsteace/go-lib/reqres"
-	"github.com/solsteace/kochira/account/internal/messaging"
 	"github.com/solsteace/kochira/account/internal/service"
 )
 
@@ -44,14 +43,6 @@ func (s Account) Register(w http.ResponseWriter, r *http.Request) error {
 	resPayload := map[string]any{"msg": "Account successfully created"}
 	if err := reqres.HttpOk(w, http.StatusCreated, resPayload); err != nil {
 		return fmt.Errorf("[%s] controller<Account.Register>: %w", reqId, err)
-	}
-	return nil
-}
-
-func (a Account) PublishNewUser(maxUser uint, sender func(body []byte) error) error {
-	makePayload := messaging.SerCreateSubscription
-	if err := a.service.HandleRegisteredUsers(maxUser, makePayload, sender); err != nil {
-		return fmt.Errorf("[%s] controller<Account.PublishNewUser>: %w", err)
 	}
 	return nil
 }
