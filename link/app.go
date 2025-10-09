@@ -53,8 +53,8 @@ func RunApp() {
 	}
 	queues := map[string][]string{
 		"default": []string{
-			service.CheckSubscriptionQueue,
-			service.FinishShorteningQueue}}
+			service.FinishShorteningQueue,
+			service.SubscriptionExpiredQueue}}
 	for c, queue := range queues {
 		for _, q := range queue {
 			err := mq.AddQueue(c, utility.NewDefaultAmqpQueueOpts(q))
@@ -62,6 +62,16 @@ func RunApp() {
 				log.Fatalf("%s: queue init: %v", moduleName, err)
 			}
 		}
+	}
+
+	err = mq.BindQueue(
+		"default",
+		utility.NewDefaultAmqpQueueBindOpts(
+			service.SubscriptionExpiredQueue,
+			"#",
+			service.SubscriptionExpiredExchange))
+	if err != nil {
+		log.Fatalf("%s: queue binding: %v", moduleName, err)
 	}
 
 	// ========================================

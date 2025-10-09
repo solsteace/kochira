@@ -63,7 +63,7 @@ func RunApp() {
 	}
 
 	exchanges := map[string]string{
-		"example": "fanout"}
+		"subscription.expirations": "fanout"}
 	for name, kind := range exchanges {
 		mq.AddExchange("default", utility.NewDefaultAmqpExchangeOpts(name, kind))
 	}
@@ -141,14 +141,7 @@ func RunApp() {
 			callback: func() error {
 				return subscriptionService.PublishSubscriptionExpired(
 					20, subscriptionExpired.FromSubscriptionExpired)
-			}},
-		publisher{
-			interval: time.Second * 2,
-			callback: func() error {
-				return subscriptionService.PublishSubscriptionExpired(
-					0, subscriptionExpired.FromSubscriptionExpired)
-			},
-		}}
+			}}}
 	for _, p := range publishers {
 		go func() {
 			t := time.NewTicker(p.interval)

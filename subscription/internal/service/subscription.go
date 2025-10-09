@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	CreateSubcriptionQueue = "create.subscription"
-	CheckSubscriptionQueue = "check.subscription"
-	FinishShorteningQueue  = "finish.shortening"
+	CreateSubcriptionQueue      = "subscription.creator"
+	CheckSubscriptionQueue      = "subscription.checker"
+	SubscriptionExpiredExchange = "subscription.expirations"
+	FinishShorteningQueue       = "link.shortening_finisher" // Depends on `link` service
 )
 
 type Subscription struct {
@@ -139,7 +140,7 @@ func (p Subscription) PublishSubscriptionExpired(
 		}
 
 		err = p.messenger.Publish("default", payload, utility.NewDefaultAmqpPublishOpts(
-			"example", "test", "application/json"))
+			SubscriptionExpiredExchange, "", "application/json"))
 		if err != nil {
 			return fmt.Errorf("service<Shortening.PublishFinishShortening>: %w", err)
 		}

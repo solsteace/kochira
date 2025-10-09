@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	CheckSubscriptionQueue   = "check.subscription"
-	FinishShorteningQueue    = "finish.shortening"
-	SubscriptionExpiredQueue = "test"
+	FinishShorteningQueue       = "link.shortening_finisher"
+	SubscriptionExpiredQueue    = "link.subscription_expiration_watcher"
+	SubscriptionExpiredExchange = "subscription.expirations"
+	CheckSubscriptionQueue      = "subscription.checker" // depends on `subscription` service
 )
 
 type Shortening struct {

@@ -119,14 +119,8 @@ func RunApp() {
 		log.Fatalf("%s: %v", moduleName, err2)
 	}
 
-	err = mq.AddQueue("default", utility.NewDefaultAmqpQueueOpts("create.subscription"))
-	if err != nil {
-		err2 := fmt.Errorf("account<RunApp>: queue init: %w", err)
-		log.Fatalf("%s: %v", moduleName, err2)
-	}
-
 	go func() {
-		opts := utility.NewDefaultAmqpPublishOpts("", "create.subscription", "application/json")
+		opts := utility.NewDefaultAmqpPublishOpts("", service.CreateSubscriptionQueue, "application/json")
 		send := func(body []byte) error {
 			return mq.Publish("default", body, opts)
 		}

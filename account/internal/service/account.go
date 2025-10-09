@@ -8,6 +8,8 @@ import (
 	"github.com/solsteace/kochira/account/internal/utility/hash"
 )
 
+const CreateSubscriptionQueue = "subscription.creator" // `depends on `subscription` service
+
 type Account struct {
 	accountStore accountStore.User
 	hasher       hash.Handler
