@@ -44,14 +44,8 @@ func (repo pg) FilterExisting(id []uint64) ([]uint64, error) {
 		WITH id_to_check("id") AS (%s)
 		SELECT id FROM id_to_check
 		WHERE id NOT IN (SELECT id FROM subscriptions)`, idToCheck)
-	query, args, err := sqlx.In(query, id)
-	if err != nil {
-		return []uint64{}, fmt.Errorf(
-			"persistence<pg.CheckManyByOwner>: %w", err)
-	}
-
 	filteredId := new([]uint64)
-	if err := repo.db.Select(filteredId, repo.db.Rebind(query), args...); err != nil {
+	if err := repo.db.Select(filteredId, query); err != nil {
 		return []uint64{}, fmt.Errorf(
 			"persistence<pg.CheckManyByOwner>: %w", err)
 	}
