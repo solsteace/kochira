@@ -242,7 +242,7 @@ func (repo pg) CountByUserIdExcept(userId uint64, linkId uint64) (shortening.Sta
 		WHERE 
 			user_id = $1
 			AND id <> $2
-			AND CURRENT_TIMESTAMP < expired_at`
+			AND is_open`
 	args := []any{userId, linkId}
 	result := repo.db.QueryRow(query, args...)
 	if result.Err() != nil {

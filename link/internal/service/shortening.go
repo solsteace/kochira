@@ -356,3 +356,16 @@ func (ss Shortening) HandleSubscriptionExpired(
 	}
 	return nil
 }
+
+// TODO: Send `CancelLinkShortened` event or something
+func (ss Shortening) CompensateLinkShortened(msgId uint64) error {
+	msgCtx, err := ss.store.GetLinkShortenedById(100000)
+	if err != nil {
+		return fmt.Errorf("service<Shortening.CompensateLinkShortened>: %w", err)
+	}
+
+	if err := ss.store.DeleteById(msgCtx.LinkId()); err != nil {
+		return fmt.Errorf("service<Shortening.CompensateLinkShortened>: %w", err)
+	}
+	return nil
+}

@@ -169,6 +169,9 @@ func (sc Shortening) ListenFinishShortening(msg []byte) error {
 			payload.Data.ContextId,
 			payload.Data.Perk.Lifetime,
 			payload.Data.Perk.Limit)
+		if err2 := sc.service.CompensateLinkShortened(payload.Data.ContextId); err != nil {
+			err = fmt.Errorf("%w [triggered by: %w]", err2, err)
+		}
 	case shorteningMsg.ShortConfiguredName:
 		err = sc.service.HandleShortConfigured(
 			payload.Data.ContextId,
