@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -32,26 +31,6 @@ func newPgSubscriptionRow(s subscription.Subscription) pgSubscription {
 		ExpiredAt: s.ExpiredAt()}
 }
 
-func (repo pg) FilterExisting(id []uint64) ([]uint64, error) {
-	// Warning: SQL standard, but not universal in the way of adoption
-	idRows := []string{}
-	for _, i := range id {
-		idRows = append(idRows, fmt.Sprintf("(%d)", i))
-	}
-	idToCheck := fmt.Sprintf("VALUES %s", strings.Join(idRows, ","))
-
-	query := fmt.Sprintf(`
-		WITH id_to_check("id") AS (%s)
-		SELECT id FROM id_to_check
-		WHERE id NOT IN (SELECT id FROM subscriptions)`, idToCheck)
-	filteredId := new([]uint64)
-	if err := repo.db.Select(filteredId, query); err != nil {
-		return []uint64{}, fmt.Errorf(
-			"persistence<pg.CheckManyByOwner>: %w", err)
-	}
-	return *filteredId, nil
-}
-
 func (repo pg) GetByOwner(id uint64) (subscription.Subscription, error) {
 	row := new(pgSubscription)
 	query := `
@@ -78,7 +57,8 @@ func (repo pg) Create(subscriptions []subscription.Subscription) error {
 
 	query := `
 		INSERT INTO subscriptions(user_id, expired_at)
-		VALUES (:user_id, :expired_at)`
+		VALUES (:user_id, :expired_at)
+		ON CONFLICT DO NOTHING`
 	if _, err := repo.db.NamedExec(query, rows); err != nil {
 		return fmt.Errorf("persistence<pg.Create>: %w", err)
 	}

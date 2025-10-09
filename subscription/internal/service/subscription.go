@@ -42,14 +42,9 @@ func (s Subscription) GetByUserId(id uint64) (subscription.Subscription, error) 
 }
 
 func (s Subscription) Init(userId []uint64) error {
-	newSubscriptions, err := s.store.FilterExisting(userId)
-	if err != nil {
-		return fmt.Errorf("service<Subscription.Init>: %w", err)
-	}
-
 	now := time.Now()
 	subscriptions := []subscription.Subscription{}
-	for _, uId := range newSubscriptions {
+	for _, uId := range userId {
 		s, err := subscription.NewSubscription(nil, uId, now)
 		if err != nil {
 			return fmt.Errorf("service<Subscription.Init>: %w", err)

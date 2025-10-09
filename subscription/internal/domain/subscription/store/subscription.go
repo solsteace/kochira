@@ -8,8 +8,7 @@ import (
 
 type Subscription interface {
 	GetByOwner(id uint64) (subscription.Subscription, error)
-	FilterExisting(id []uint64) ([]uint64, error)
-	Create(s []subscription.Subscription) error
+	Create(s []subscription.Subscription) error // Creates new subscription while ignoring the existing ones
 
 	// Events ===========
 
