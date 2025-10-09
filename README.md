@@ -6,7 +6,7 @@ Worry not, Kochira will ***show you the way*** to share links!
 ## Feature Roadmap
 
 - [x] URL Shortener
-- [ ] Premium perk subscription (simulation! 😁)
+- [x] Premium perk subscription (simulation! 😁)
   - [x] Subscription-aware core feature
   - [ ] Purchasing/extending (not planned to be implemented, for now)
 
