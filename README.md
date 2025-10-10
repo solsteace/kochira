@@ -44,7 +44,10 @@ use (
 ``` 
 
 ### Deploying
+
 You could deploy this project in:
+
+> Figures served as illustration only and may not always reflect how one should deploy it
 
 <details>
   <summary>monolith</summary>
