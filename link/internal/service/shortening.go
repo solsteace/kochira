@@ -45,6 +45,12 @@ func (s Shortening) GetById(userId, id uint64) (shortening.Link, error) {
 	if err != nil {
 		return shortening.Link{}, fmt.Errorf("service<Shortening.GetById>: %w", err)
 	}
+
+	if !link.AccessibleBy(userId) {
+		return shortening.Link{}, fmt.Errorf(
+			"service<Shortening.GetById>: %w",
+			oops.Forbidden{Msg: "You don't have access to this link"})
+	}
 	return link, nil
 }
 

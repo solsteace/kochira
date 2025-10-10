@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/solsteace/go-lib/reqres"
@@ -21,6 +22,18 @@ type Shortening struct {
 	checkSubscription   messaging.CheckSubscriptionMessenger
 	finishShortening    messaging.FinishShorteningMessenger
 	subscriptionExpired messaging.SubscriptionExpiredMessenger
+}
+
+// Move later to a viewer object or something
+type shorteningLinkView struct {
+	Id          uint64    `json:"id"`
+	UserId      uint64    `json:"user_id"`
+	Shortened   string    `json:"shortened"`
+	Alias       string    `json:"alias"`
+	Destination string    `json:"destination"`
+	IsOpen      bool      `json:"is_open"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	ExpiredAt   time.Time `json:"expired_at"`
 }
 
 func (lr Shortening) GetSelf(w http.ResponseWriter, r *http.Request) error {
@@ -45,7 +58,19 @@ func (lr Shortening) GetSelf(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("[%s] controller<Shortening.GetSelf>: %w", reqId, err)
 	}
 
-	if err := reqres.HttpOk(w, http.StatusOK, result); err != nil {
+	resPayload := []shorteningLinkView{}
+	for _, r := range result {
+		resPayload = append(resPayload, shorteningLinkView{
+			Id:          r.Id(),
+			UserId:      r.UserId(),
+			Shortened:   r.Shortened(),
+			Alias:       r.Alias(),
+			Destination: r.Destination(),
+			IsOpen:      r.IsOpen(),
+			UpdatedAt:   r.UpdatedAt(),
+			ExpiredAt:   r.ExpiredAt()})
+	}
+	if err := reqres.HttpOk(w, http.StatusOK, resPayload); err != nil {
 		return fmt.Errorf("[%s] controller<Shortening.GetSelf>: %w", reqId, err)
 	}
 	return nil
@@ -64,7 +89,16 @@ func (lr Shortening) GetById(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("[%s] controller<Shortening.GetById>: %w", reqId, err)
 	}
 
-	if err := reqres.HttpOk(w, http.StatusOK, result); err != nil {
+	resPayload := shorteningLinkView{
+		Id:          result.Id(),
+		UserId:      result.UserId(),
+		Shortened:   result.Shortened(),
+		Alias:       result.Alias(),
+		Destination: result.Destination(),
+		IsOpen:      result.IsOpen(),
+		UpdatedAt:   result.UpdatedAt(),
+		ExpiredAt:   result.ExpiredAt()}
+	if err := reqres.HttpOk(w, http.StatusOK, resPayload); err != nil {
 		return fmt.Errorf("[%s] controller<Shortening.GetById>: %w", reqId, err)
 	}
 	return nil
